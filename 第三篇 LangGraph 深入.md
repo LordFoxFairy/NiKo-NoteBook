@@ -1136,40 +1136,136 @@ app = workflow.compile(checkpointer=checkpointer)
 **Checkpointer 接口**
 
 ```python
-from langgraph.checkpoint import BaseCheckpointSaver, Checkpoint
-from typing import Optional
+from langgraph.checkpoint.base import (
+    BaseCheckpointSaver,
+    Checkpoint,
+    CheckpointMetadata,
+    CheckpointTuple,
+    ChannelVersions
+)
+from langchain_core.runnables.config import RunnableConfig
+from typing import Optional, Iterator, Dict, Any, Sequence, Tuple
 
 class CustomCheckpointer(BaseCheckpointSaver):
-    """自定义 Checkpointer"""
+    """自定义 Checkpointer - 符合最新版本接口"""
+
+    def __init__(self):
+        super().__init__()
+        # 这里可以初始化存储后端，如 Redis、MongoDB 等
+        self.storage = {}  # 简单示例用字典存储
 
     def put(
         self,
-        config: dict,
+        config: RunnableConfig,
         checkpoint: Checkpoint,
-        metadata: dict
-    ) -> dict:
-        """保存 checkpoint"""
+        metadata: CheckpointMetadata,
+        new_versions: ChannelVersions
+    ) -> RunnableConfig:
+        """保存 checkpoint
+
+        Args:
+            config: 运行配置
+            checkpoint: 要保存的检查点
+            metadata: 检查点元数据
+            new_versions: 通道版本信息
+
+        Returns:
+            更新后的配置
+        """
         thread_id = config["configurable"]["thread_id"]
+        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = checkpoint["id"]
 
-        # 实现：保存到自定义存储（如 Redis、MongoDB）
-        save_to_storage(thread_id, checkpoint_id, checkpoint, metadata)
+        # 构造存储键
+        key = f"{thread_id}:{checkpoint_ns}:{checkpoint_id}"
+
+        # 保存到存储（实际应用中应该保存到 Redis、MongoDB 等）
+        self.storage[key] = {
+            "checkpoint": checkpoint,
+            "metadata": metadata,
+            "config": config,
+            "new_versions": new_versions
+        }
 
         return config
 
-    def get(self, config: dict) -> Optional[Checkpoint]:
-        """获取 checkpoint"""
+    def get(self, config: RunnableConfig) -> Optional[Checkpoint]:
+        """获取最新的 checkpoint"""
         thread_id = config["configurable"]["thread_id"]
+        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
+        checkpoint_id = config["configurable"].get("checkpoint_id")
 
-        # 实现：从存储加载
-        return load_from_storage(thread_id)
+        if checkpoint_id:
+            # 获取特定的 checkpoint
+            key = f"{thread_id}:{checkpoint_ns}:{checkpoint_id}"
+            if key in self.storage:
+                return self.storage[key]["checkpoint"]
+        else:
+            # 获取最新的 checkpoint
+            prefix = f"{thread_id}:{checkpoint_ns}:"
+            matching_keys = [k for k in self.storage.keys() if k.startswith(prefix)]
 
-    def list(self, config: dict) -> list[Checkpoint]:
+            if matching_keys:
+                latest_key = max(matching_keys,
+                               key=lambda k: self.storage[k]["checkpoint"]["ts"])
+                return self.storage[latest_key]["checkpoint"]
+
+        return None
+
+    def list(
+        self,
+        config: Optional[RunnableConfig],
+        *,
+        filter: Optional[Dict[str, Any]] = None,
+        before: Optional[RunnableConfig] = None,
+        limit: Optional[int] = None
+    ) -> Iterator[CheckpointTuple]:
         """列出所有 checkpoint"""
-        thread_id = config["configurable"]["thread_id"]
+        if config is None:
+            items = list(self.storage.items())
+        else:
+            thread_id = config["configurable"]["thread_id"]
+            checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
+            prefix = f"{thread_id}:{checkpoint_ns}:"
 
-        # 实现：列出历史 checkpoint
-        return list_from_storage(thread_id)
+            items = [(k, v) for k, v in self.storage.items()
+                    if k.startswith(prefix)]
+
+        # 按时间戳倒序排序
+        items.sort(key=lambda x: x[1]["checkpoint"]["ts"], reverse=True)
+
+        # 应用 limit
+        if limit:
+            items = items[:limit]
+
+        # 生成 CheckpointTuple
+        for key, value in items:
+            yield CheckpointTuple(
+                config=value["config"],
+                checkpoint=value["checkpoint"],
+                metadata=value["metadata"],
+                parent_config=None
+            )
+
+    def put_writes(
+        self,
+        config: RunnableConfig,
+        writes: Sequence[Tuple[str, Any]],
+        task_id: str,
+        task_path: str = ""
+    ) -> None:
+        """保存待写入的数据"""
+        thread_id = config["configurable"]["thread_id"]
+        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
+        checkpoint_id = config["configurable"].get("checkpoint_id")
+
+        key = f"{thread_id}:{checkpoint_ns}:{checkpoint_id}:writes:{task_id}"
+
+        self.storage[key] = {
+            "writes": writes,
+            "task_id": task_id,
+            "task_path": task_path
+        }
 ```
 
 **示例：Redis Checkpointer**
@@ -1177,52 +1273,138 @@ class CustomCheckpointer(BaseCheckpointSaver):
 ```python
 import json
 import redis
-from langgraph.checkpoint import BaseCheckpointSaver, Checkpoint
+from langgraph.checkpoint.base import (
+    BaseCheckpointSaver,
+    Checkpoint,
+    CheckpointMetadata,
+    CheckpointTuple,
+    ChannelVersions
+)
+from langchain_core.runnables.config import RunnableConfig
 
 class RedisCheckpointer(BaseCheckpointSaver):
     """基于 Redis 的 Checkpointer"""
 
     def __init__(self, redis_client: redis.Redis):
+        super().__init__()
         self.redis = redis_client
 
-    def put(self, config: dict, checkpoint: Checkpoint, metadata: dict) -> dict:
+    def put(
+        self,
+        config: RunnableConfig,
+        checkpoint: Checkpoint,
+        metadata: CheckpointMetadata,
+        new_versions: ChannelVersions
+    ) -> RunnableConfig:
+        """保存 checkpoint 到 Redis"""
         thread_id = config["configurable"]["thread_id"]
+        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = checkpoint["id"]
 
-        key = f"checkpoint:{thread_id}:{checkpoint_id}"
+        # 构造 Redis key
+        key = f"checkpoint:{thread_id}:{checkpoint_ns}:{checkpoint_id}"
 
-        # 序列化并保存
+        # 序列化数据
         data = {
             "checkpoint": checkpoint,
-            "metadata": metadata
+            "metadata": metadata,
+            "config": config,
+            "new_versions": new_versions,
+            "ts": checkpoint["ts"]  # 用于排序
         }
-        self.redis.set(key, json.dumps(data))
 
-        # 添加到索引
-        self.redis.zadd(
-            f"checkpoints:{thread_id}",
-            {checkpoint_id: checkpoint["ts"]}
-        )
+        # 保存到 Redis
+        self.redis.set(key, json.dumps(data, default=str))
+
+        # 添加到有序集合以便按时间排序
+        score_key = f"checkpoints:{thread_id}:{checkpoint_ns}"
+        self.redis.zadd(score_key, {checkpoint_id: checkpoint["ts"]})
 
         return config
 
-    def get(self, config: dict) -> Optional[Checkpoint]:
+    def get(self, config: RunnableConfig) -> Optional[Checkpoint]:
+        """从 Redis 获取 checkpoint"""
         thread_id = config["configurable"]["thread_id"]
+        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
+        checkpoint_id = config["configurable"].get("checkpoint_id")
 
-        # 获取最新的 checkpoint_id
-        latest = self.redis.zrevrange(f"checkpoints:{thread_id}", 0, 0)
+        if checkpoint_id:
+            # 获取特定的 checkpoint
+            key = f"checkpoint:{thread_id}:{checkpoint_ns}:{checkpoint_id}"
+            data = self.redis.get(key)
+            if data:
+                return json.loads(data)["checkpoint"]
+        else:
+            # 获取最新的 checkpoint
+            score_key = f"checkpoints:{thread_id}:{checkpoint_ns}"
+            latest_ids = self.redis.zrevrange(score_key, 0, 0)
 
-        if not latest:
-            return None
+            if latest_ids:
+                latest_id = latest_ids[0].decode() if isinstance(latest_ids[0], bytes) else latest_ids[0]
+                key = f"checkpoint:{thread_id}:{checkpoint_ns}:{latest_id}"
+                data = self.redis.get(key)
+                if data:
+                    return json.loads(data)["checkpoint"]
 
-        checkpoint_id = latest[0].decode()
-        key = f"checkpoint:{thread_id}:{checkpoint_id}"
+        return None
 
-        data = self.redis.get(key)
-        if not data:
-            return None
+    def list(
+        self,
+        config: Optional[RunnableConfig],
+        *,
+        filter: Optional[dict] = None,
+        before: Optional[RunnableConfig] = None,
+        limit: Optional[int] = None
+    ) -> Iterator[CheckpointTuple]:
+        """从 Redis 列出 checkpoints"""
+        if config:
+            thread_id = config["configurable"]["thread_id"]
+            checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
 
-        return json.loads(data)["checkpoint"]
+            score_key = f"checkpoints:{thread_id}:{checkpoint_ns}"
+
+            # 获取所有 checkpoint IDs，按时间倒序
+            checkpoint_ids = self.redis.zrevrange(
+                score_key,
+                0,
+                limit - 1 if limit else -1
+            )
+
+            for checkpoint_id in checkpoint_ids:
+                cid = checkpoint_id.decode() if isinstance(checkpoint_id, bytes) else checkpoint_id
+                key = f"checkpoint:{thread_id}:{checkpoint_ns}:{cid}"
+                data = self.redis.get(key)
+
+                if data:
+                    parsed = json.loads(data)
+                    yield CheckpointTuple(
+                        config=parsed["config"],
+                        checkpoint=parsed["checkpoint"],
+                        metadata=parsed["metadata"],
+                        parent_config=None
+                    )
+
+    def put_writes(
+        self,
+        config: RunnableConfig,
+        writes: Sequence[Tuple[str, Any]],
+        task_id: str,
+        task_path: str = ""
+    ) -> None:
+        """保存写入数据到 Redis"""
+        thread_id = config["configurable"]["thread_id"]
+        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
+        checkpoint_id = config["configurable"].get("checkpoint_id")
+
+        key = f"writes:{thread_id}:{checkpoint_ns}:{checkpoint_id}:{task_id}"
+
+        data = {
+            "writes": list(writes),
+            "task_id": task_id,
+            "task_path": task_path
+        }
+
+        self.redis.set(key, json.dumps(data, default=str))
 
 # 使用
 redis_client = redis.Redis(host="localhost", port=6379)
@@ -1359,10 +1541,7 @@ def agent_with_memory(state):
 
 **LangMem 简介**
 
-LangMem SDK 是 LangChain 提供的长期记忆管理工具，支持三种类型的记忆：
-- **Episodic Memory**（情节记忆）：过去交互的具体事件
-- **Procedural Memory**（过程记忆）：如何执行任务的知识
-- **Semantic Memory**（语义记忆）：事实和知识
+LangMem SDK 是 LangChain 提供的长期记忆管理工具，用于在 LangGraph 中实现持久化记忆系统。它提供了记忆的提取、管理和搜索功能。
 
 **安装**
 
@@ -1370,247 +1549,310 @@ LangMem SDK 是 LangChain 提供的长期记忆管理工具，支持三种类型
 pip install langmem
 ```
 
-**Episodic Memory - 情节记忆**
+**核心概念**
+
+LangMem 提供了两个核心组件：
+1. **Memory Manager**: 从对话中提取和管理记忆
+2. **Memory Searcher**: 搜索相关记忆
+
+**使用 Memory Manager**
 
 ```python
-from langmem import EpisodicMemory
+from langmem import create_memory_manager, create_memory_searcher
 from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, MessagesState
+from langchain_core.messages import HumanMessage, AIMessage
 
-# 创建情节记忆
-episodic = EpisodicMemory(
+# 创建记忆管理器节点
+memory_manager = create_memory_manager(
     model=ChatOpenAI(model="gpt-4"),
-    store_type="postgres",  # 或 "sqlite", "memory"
-    connection_string="postgresql://localhost/langmem"
+    # 可选：自定义记忆提取指令
+    instructions="提取用户偏好、重要事实和交互模式"
 )
 
-# 保存交互
-episodic.add_interaction(
-    user_id="alice",
-    messages=[
-        HumanMessage("推荐一部科幻电影"),
-        AIMessage("推荐《星际穿越》，这是一部关于时间和引力的硬科幻电影")
-    ],
-    metadata={"session_id": "session-001", "timestamp": "2024-01-01"}
-)
-
-# 回忆相关交互
-similar_interactions = episodic.search(
-    user_id="alice",
-    query="电影推荐",
-    limit=5
-)
-
-# 在 Agent 中使用
-def agent_with_episodic_memory(state):
-    user_id = state.get("user_id")
-    current_query = state["messages"][-1].content
-
-    # 搜索相关的过去交互
-    relevant_memories = episodic.search(user_id, current_query, limit=3)
-
-    # 构建上下文
-    context = "\n".join([
-        f"过去的对话：\nQ: {m['messages'][0].content}\nA: {m['messages'][1].content}"
-        for m in relevant_memories
-    ])
-
-    # 调用模型
-    model = ChatOpenAI(model="gpt-4")
-    response = model.invoke([
-        SystemMessage(content=f"相关上下文：\n{context}"),
-        *state["messages"]
-    ])
-
-    # 保存新的交互
-    episodic.add_interaction(
-        user_id=user_id,
-        messages=[state["messages"][-1], response]
-    )
-
-    return {"messages": [response]}
-```
-
-**Procedural Memory - 过程记忆**
-
-```python
-from langmem import ProceduralMemory
-
-# 创建过程记忆
-procedural = ProceduralMemory(
+# 创建记忆搜索器节点
+memory_searcher = create_memory_searcher(
     model=ChatOpenAI(model="gpt-4"),
-    store_type="postgres"
+    prompt="搜索与当前对话相关的记忆"
 )
 
-# 保存任务执行方式
-procedural.add_procedure(
-    user_id="alice",
-    task="数据分析",
-    steps=[
-        "1. 加载数据",
-        "2. 数据清洗",
-        "3. 统计分析",
-        "4. 可视化",
-        "5. 生成报告"
-    ],
-    feedback="这个流程效率很高",
-    metadata={"task_type": "analysis"}
-)
+# 在 LangGraph 中集成记忆系统
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, Annotated
+from operator import add
 
-# 回忆如何执行任务
-procedure = procedural.get_procedure(
-    user_id="alice",
-    task="数据分析"
-)
+class MemoryState(TypedDict):
+    messages: Annotated[list, add]
+    memories: list
+    user_id: str
 
-# 在 Agent 中使用
-def agent_with_procedural_memory(state):
-    user_id = state.get("user_id")
-    task = extract_task(state["messages"][-1].content)
+# 构建带记忆的工作流
+def build_memory_graph():
+    workflow = StateGraph(MemoryState)
 
-    # 回忆如何执行这个任务
-    procedure = procedural.get_procedure(user_id, task)
+    # 添加记忆搜索节点
+    async def search_memories(state: MemoryState):
+        """搜索相关记忆"""
+        # memory_searcher 会自动处理消息并返回相关记忆
+        memories = await memory_searcher.ainvoke(state)
+        return {"memories": memories}
 
-    if procedure:
-        # 使用学到的流程
-        system_prompt = f"执行'{task}'任务时，遵循这个流程：\n{procedure['steps']}"
-    else:
-        system_prompt = f"执行'{task}'任务"
+    # 添加 Agent 节点
+    def agent(state: MemoryState):
+        """使用记忆的 Agent"""
+        model = ChatOpenAI(model="gpt-4")
 
-    model = ChatOpenAI(model="gpt-4")
-    response = model.invoke([
-        SystemMessage(content=system_prompt),
-        *state["messages"]
-    ])
+        # 构建带记忆的系统提示
+        memory_context = ""
+        if state.get("memories"):
+            memory_context = "\n相关记忆：\n" + "\n".join([
+                f"- {mem['content']}" for mem in state["memories"]
+            ])
 
-    return {"messages": [response]}
-```
-
-**Semantic Memory - 语义记忆**
-
-```python
-from langmem import SemanticMemory
-
-# 创建语义记忆
-semantic = SemanticMemory(
-    model=ChatOpenAI(model="gpt-4"),
-    embeddings=OpenAIEmbeddings(),
-    store_type="postgres"
-)
-
-# 保存事实
-semantic.add_fact(
-    user_id="alice",
-    fact="Alice 喜欢猫",
-    category="preferences"
-)
-
-semantic.add_fact(
-    user_id="alice",
-    fact="Alice 是软件工程师",
-    category="profile"
-)
-
-# 查询事实
-facts = semantic.search(
-    user_id="alice",
-    query="Alice 的职业",
-    limit=5
-)
-
-# 在 Agent 中使用
-def agent_with_semantic_memory(state):
-    user_id = state.get("user_id")
-    query = state["messages"][-1].content
-
-    # 搜索相关事实
-    relevant_facts = semantic.search(user_id, query, limit=5)
-
-    # 构建上下文
-    context = "已知事实：\n" + "\n".join([f["fact"] for f in relevant_facts])
-
-    model = ChatOpenAI(model="gpt-4")
-    response = model.invoke([
-        SystemMessage(content=context),
-        *state["messages"]
-    ])
-
-    # 从对话中提取新事实
-    new_facts = extract_facts(state["messages"][-1].content, response.content)
-    for fact in new_facts:
-        semantic.add_fact(user_id, fact)
-
-    return {"messages": [response]}
-```
-
-**综合使用三种记忆**
-
-```python
-from langmem import EpisodicMemory, ProceduralMemory, SemanticMemory
-
-class MemoryEnhancedAgent:
-    """带完整记忆系统的 Agent"""
-
-    def __init__(self, model):
-        self.model = model
-        self.episodic = EpisodicMemory(model)
-        self.procedural = ProceduralMemory(model)
-        self.semantic = SemanticMemory(model)
-
-    def __call__(self, state):
-        user_id = state.get("user_id")
-        query = state["messages"][-1].content
-
-        # 1. 回忆相关交互（情节记忆）
-        past_interactions = self.episodic.search(user_id, query, limit=2)
-
-        # 2. 回忆执行方法（过程记忆）
-        task = extract_task(query)
-        procedure = self.procedural.get_procedure(user_id, task)
-
-        # 3. 回忆相关事实（语义记忆）
-        facts = self.semantic.search(user_id, query, limit=5)
-
-        # 4. 构建上下文
-        context_parts = []
-
-        if past_interactions:
-            context_parts.append("相关过去对话：\n" + format_interactions(past_interactions))
-
-        if procedure:
-            context_parts.append(f"执行方法：\n{procedure['steps']}")
-
-        if facts:
-            context_parts.append("相关事实：\n" + "\n".join([f["fact"] for f in facts]))
-
-        context = "\n\n".join(context_parts)
-
-        # 5. 调用模型
-        response = self.model.invoke([
-            SystemMessage(content=context),
+        response = model.invoke([
+            SystemMessage(content=f"你是一个有记忆的助手。{memory_context}"),
             *state["messages"]
         ])
 
-        # 6. 保存新记忆
-        self.episodic.add_interaction(user_id, [state["messages"][-1], response])
+        return {"messages": [response]}
 
-        new_facts = extract_facts(query, response.content)
-        for fact in new_facts:
-            self.semantic.add_fact(user_id, fact)
+    # 添加记忆管理节点
+    async def manage_memories(state: MemoryState):
+        """提取并保存新记忆"""
+        # memory_manager 会自动从对话中提取记忆
+        extracted_memories = await memory_manager.ainvoke(state)
+        # 记忆会自动保存到存储中
+        return {}
+
+    # 构建工作流
+    workflow.add_node("search_memories", search_memories)
+    workflow.add_node("agent", agent)
+    workflow.add_node("manage_memories", manage_memories)
+
+    # 定义边
+    workflow.add_edge("search_memories", "agent")
+    workflow.add_edge("agent", "manage_memories")
+    workflow.add_edge("manage_memories", END)
+
+    # 设置入口
+    workflow.set_entry_point("search_memories")
+
+    return workflow.compile()
+
+# 使用示例
+app = build_memory_graph()
+
+# 运行对话
+result = await app.ainvoke({
+    "messages": [HumanMessage("我叫 Alice，我喜欢科幻电影")],
+    "user_id": "alice",
+    "memories": []
+})
+
+# 后续对话会记住之前的信息
+result = await app.ainvoke({
+    "messages": [HumanMessage("推荐一部电影给我")],
+    "user_id": "alice",
+    "memories": []
+})
+```
+
+**自定义记忆存储**
+
+```python
+from langchain_core.stores import InMemoryStore
+from langgraph.store import BaseStore
+import json
+
+class CustomMemoryStore(BaseStore):
+    """自定义记忆存储实现"""
+
+    def __init__(self):
+        self.store = {}
+
+    async def aget(self, namespace: tuple, key: str):
+        """获取记忆"""
+        ns_key = "/".join(namespace)
+        return self.store.get(ns_key, {}).get(key)
+
+    async def aput(self, namespace: tuple, key: str, value: dict):
+        """保存记忆"""
+        ns_key = "/".join(namespace)
+        if ns_key not in self.store:
+            self.store[ns_key] = {}
+        self.store[ns_key][key] = value
+
+    async def asearch(self, namespace: tuple, query: str, limit: int = 10):
+        """搜索记忆"""
+        ns_key = "/".join(namespace)
+        memories = self.store.get(ns_key, {})
+        # 简单实现：返回所有记忆
+        # 实际应该使用向量搜索
+        return list(memories.values())[:limit]
+
+# 使用自定义存储
+store = CustomMemoryStore()
+
+# 创建带自定义存储的记忆管理器
+memory_manager = create_memory_manager(
+    model=ChatOpenAI(model="gpt-4"),
+    # store 参数需要通过 LangGraph 配置传递
+)
+```
+
+**实际使用示例：构建记忆增强的客服助手**
+
+```python
+from langmem import create_memory_manager, create_memory_searcher
+from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, MessagesState, END
+from langchain_core.messages import SystemMessage
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
+
+class CustomerServiceState(MessagesState):
+    """客服状态，包含消息和记忆"""
+    memories: list = []
+    user_id: str = ""
+
+def build_customer_service_agent():
+    """构建带记忆的客服助手"""
+
+    # 初始化组件
+    model = ChatOpenAI(model="gpt-4")
+    store = InMemoryStore()
+
+    # 创建记忆管理组件
+    memory_manager = create_memory_manager(
+        model=model,
+        instructions="""
+        提取以下信息：
+        1. 用户偏好和需求
+        2. 用户问题和解决方案
+        3. 用户满意度和反馈
+        4. 重要的个人信息（如会员等级、购买历史）
+        """
+    )
+
+    memory_searcher = create_memory_searcher(
+        model=model,
+        prompt="搜索与用户问题相关的历史记录和解决方案"
+    )
+
+    # 创建工作流
+    workflow = StateGraph(CustomerServiceState)
+
+    # 搜索记忆节点
+    async def search_memories(state: CustomerServiceState):
+        """搜索用户历史记忆"""
+        if not state["messages"]:
+            return {"memories": []}
+
+        # 使用 memory_searcher 搜索相关记忆
+        memories = await memory_searcher.ainvoke({
+            "messages": state["messages"],
+            "user_id": state["user_id"]
+        })
+
+        return {"memories": memories}
+
+    # 客服响应节点
+    def customer_service(state: CustomerServiceState):
+        """生成客服响应"""
+        # 构建记忆上下文
+        memory_context = ""
+        if state["memories"]:
+            memory_context = "\n用户历史信息：\n"
+            for mem in state["memories"]:
+                memory_context += f"- {mem.get('content', '')}\n"
+
+        # 生成响应
+        system_prompt = f"""
+        你是一个专业的客服助手。
+        {memory_context}
+
+        根据用户的历史信息和当前问题，提供个性化的服务。
+        """
+
+        response = model.invoke([
+            SystemMessage(content=system_prompt),
+            *state["messages"]
+        ])
 
         return {"messages": [response]}
 
-# 使用
-from langgraph.graph import StateGraph, END
+    # 保存记忆节点
+    async def save_memories(state: CustomerServiceState):
+        """从对话中提取并保存新记忆"""
+        if len(state["messages"]) < 2:
+            return {}
 
-workflow = StateGraph(MessagesState)
+        # 使用 memory_manager 提取记忆
+        await memory_manager.ainvoke({
+            "messages": state["messages"][-2:],  # 最后一轮对话
+            "user_id": state["user_id"]
+        })
 
-agent = MemoryEnhancedAgent(ChatOpenAI(model="gpt-4"))
-workflow.add_node("agent", agent)
-workflow.set_entry_point("agent")
-workflow.add_edge("agent", END)
+        return {}
 
-app = workflow.compile(checkpointer=MemorySaver())
+    # 添加节点
+    workflow.add_node("search_memories", search_memories)
+    workflow.add_node("customer_service", customer_service)
+    workflow.add_node("save_memories", save_memories)
+
+    # 定义流程
+    workflow.set_entry_point("search_memories")
+    workflow.add_edge("search_memories", "customer_service")
+    workflow.add_edge("customer_service", "save_memories")
+    workflow.add_edge("save_memories", END)
+
+    # 编译应用
+    checkpointer = MemorySaver()
+    app = workflow.compile(
+        checkpointer=checkpointer,
+        store=store  # 传递存储
+    )
+
+    return app
+
+# 使用客服助手
+app = build_customer_service_agent()
+
+# 第一次对话
+config = {"configurable": {"thread_id": "user-123"}}
+result = await app.ainvoke({
+    "messages": [HumanMessage("我是 VIP 会员，上个月买的商品有质量问题")],
+    "user_id": "user-123"
+}, config)
+
+# 后续对话（会记住用户是 VIP 会员）
+result = await app.ainvoke({
+    "messages": [HumanMessage("能否加急处理我的退款？")],
+    "user_id": "user-123"
+}, config)
 ```
+
+**记忆系统最佳实践**
+
+1. **记忆分类**：
+   - 短期记忆：使用 Checkpointer（会话内）
+   - 长期记忆：使用 LangMem（跨会话）
+   - 工作记忆：使用 State（当前任务）
+
+2. **记忆管理策略**：
+   - 定期清理过期记忆
+   - 合并相似记忆避免冗余
+   - 设置记忆优先级和重要性
+
+3. **性能优化**：
+   - 使用向量数据库加速搜索
+   - 实现记忆缓存机制
+   - 异步处理记忆操作
+
+4. **隐私和安全**：
+   - 加密敏感记忆
+   - 实现用户数据删除功能
+   - 记忆访问权限控制
 
 #### 8.3.4 Memory 最佳实践
 
