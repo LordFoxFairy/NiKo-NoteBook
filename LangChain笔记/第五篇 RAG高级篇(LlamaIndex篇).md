@@ -1487,6 +1487,7 @@ dynamic_extractor = DynamicLLMPathExtractor(
     llm=Settings.llm,
     max_triplets_per_chunk=15,
     num_workers=4,
+  
     allowed_entity_types=["PERSON", "ORGANIZATION", "TECHNOLOGY", "LOCATION"],
     allowed_relation_types=["WORKS_AT", "FOUNDED", "USES", "LOCATED_IN"]
 )
@@ -1889,7 +1890,7 @@ retrieved_nodes = text2cypher_retriever.retrieve(
 
 ---
 
-#### 6.3.5 自定义图检索器
+#### 自定义图检索器
 
 LlamaIndex支持创建自定义图检索器,实现特定的检索逻辑。
 
@@ -2285,6 +2286,7 @@ N跳 (N-hop):   A → ... → Z  (通过多层关系连接)
 ```
 
 **应用场景**:
+
 - **发现隐藏关联**: 两个看似无关的实体通过中间节点连接
 - **知识推理链**: 构建因果链、继承链、影响链
 - **社交网络分析**: 朋友的朋友、多度人脉

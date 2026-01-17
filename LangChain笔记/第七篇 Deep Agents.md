@@ -171,15 +171,23 @@ graph TB
 
 #### 1.2.1 安装
 
+> **版本信息**：
+> - 当前最新版本：**0.2.8**（2025年11月24日）
+> - 最低Python版本：**3.11**
+> - 核心依赖：`langchain>=0.3.0`, `langgraph>=0.2.47`
+
 ```bash
 # 使用 pip
 pip install deepagents
 
-# 使用 uv
+# 使用 uv（推荐，更快）
 uv add deepagents
 
 # 使用 poetry
 poetry add deepagents
+
+# 安装特定版本
+pip install deepagents==0.2.8
 ```
 
 **额外依赖**：
@@ -310,7 +318,7 @@ print(result["messages"][-1].content)
 
 ### 2.1 核心参数详解
 
-#### 1.3.1 model 参数
+#### 2.1.1 model 参数
 
 **默认模型**：
 
@@ -346,7 +354,7 @@ agent = create_deep_agent(
 )
 ```
 
-#### 1.3.2 system_prompt 参数
+#### 2.1.2 system_prompt 参数
 
 **提供自定义指令**：
 
@@ -402,7 +410,7 @@ You are an expert data analyst.
 """
 ```
 
-#### 1.3.3 tools 参数
+#### 2.1.3 tools 参数
 
 **传递自定义工具**：
 
@@ -478,7 +486,7 @@ def search_news(
     pass
 ```
 
-#### 1.3.4 subagents 参数
+#### 2.1.4 subagents 参数
 
 **配置专门的子代理**：
 
@@ -530,7 +538,7 @@ main_agent = create_deep_agent(
 )
 ```
 
-#### 1.3.5 interrupt_on 参数（Human-in-the-Loop）
+#### 2.1.5 interrupt_on 参数（Human-in-the-Loop）
 
 **配置审批流程**：
 
@@ -565,7 +573,7 @@ except Exception as e:
         result = agent.invoke(None, config=config)
 ```
 
-#### 1.3.6 高级参数详解
+#### 2.1.6 高级参数详解
 
 除了上述常用参数外，`create_deep_agent` 还支持多个高级参数，用于更精细的控制。
 
@@ -820,7 +828,7 @@ result = agent.invoke({
 
 ### 3.1 内置工具详解
 
-#### 1.4.1 任务规划工具
+#### 3.1.1 任务规划工具
 
 **write_todos - 创建和更新任务列表**：
 
@@ -880,7 +888,7 @@ for chunk in agent.stream({
     # 你会看到 Agent 调用 write_todos 和 read_todos 的过程
 ```
 
-#### 1.4.2 文件系统工具
+#### 3.1.2 文件系统工具
 
 **ls - 列出文件**：
 
@@ -1079,7 +1087,7 @@ agent = create_deep_agent(
 )
 ```
 
-#### 1.4.3 task 工具
+#### 3.1.3 task 工具
 
 **启动子代理**：
 
@@ -1130,7 +1138,7 @@ main_context = [
 
 ### 4.1 实战案例
 
-#### 1.5.1 研究任务
+#### 4.1.1 研究任务
 
 **场景**：研究一个技术话题并生成报告
 
@@ -1234,7 +1242,7 @@ if os.path.exists("final_report.md"):
    ])
 ```
 
-#### 1.5.2 代码库分析
+#### 4.1.2 代码库分析
 
 **场景**：分析代码库并提出优化建议
 
@@ -1304,7 +1312,7 @@ print(result["messages"][-1].content)
    write_file("analysis_report.md", aggregated_findings)
 ```
 
-#### 1.5.3 多步骤数据分析
+#### 4.1.3 多步骤数据分析
 
 **场景**：加载数据、分析、生成可视化描述
 
@@ -1367,7 +1375,7 @@ print(result["messages"][-1].content)
 
 ### 4.2 配置与优化
 
-#### 1.6.1 使用 Checkpointer 持久化
+#### 4.2.1 使用 Checkpointer 持久化
 
 ```python
 from deepagents import create_deep_agent
@@ -1396,7 +1404,7 @@ result2 = agent.invoke(
 )
 ```
 
-#### 1.6.2 控制成本
+#### 4.2.2 控制成本
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -1429,7 +1437,7 @@ main_agent = create_deep_agent(
 )
 ```
 
-#### 1.6.3 调试技巧
+#### 4.2.3 调试技巧
 
 **启用详细日志**：
 
@@ -1492,7 +1500,7 @@ print("\n=== 执行完成 ===")
 
 本章学习了 **deepagents** 库处理复杂任务：
 
-### 核心概念
+#### 核心概念
 
 1. **deepagents 是什么**
    - 独立的 Python 库，基于 LangGraph
@@ -1527,7 +1535,7 @@ print("\n=== 执行完成 ===")
    - 大量数据处理
    - 需要规划的复杂任务
 
-### 最佳实践
+#### 最佳实践
 
 1. **使用 system_prompt 指导工作流程**
 2. **让 Agent 主动使用 write_todos 规划**
@@ -1536,16 +1544,16 @@ print("\n=== 执行完成 ===")
 5. **使用 checkpointer 持久化状态**
 6. **用便宜模型控制成本**
 
-### 下一步
+#### 下一步
 
-在第五篇中，我们将学习 **Middleware 工程化**，掌握：
+在下一篇中，我们将学习 **Middleware 工程化**，掌握：
 - Middleware Hook 体系
 - 内置 Middleware 详解（TodoList、Filesystem、SubAgent、Summarization、AnthropicPromptCaching、PatchToolCalls、HumanInTheLoop）
 - 自定义 Middleware 开发
 
 ---
 
-### 思考与练习
+## 思考与练习
 
 ### 思考题
 

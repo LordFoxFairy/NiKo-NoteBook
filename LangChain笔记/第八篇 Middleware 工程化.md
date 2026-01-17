@@ -117,6 +117,7 @@ LangChain Middleware提供**6个Hook**,分为两类:
 - Hooks: `before_agent`, `before_model`, `after_model`, `after_agent`
 
 **Wrap-Style Hooks** (包装型):
+
 - 嵌套执行(洋葱模型)
 - 完全控制调用流程,可短路返回
 - Hooks: `wrap_model_call`, `wrap_tool_call`
@@ -1895,7 +1896,7 @@ class MetricsMiddleware(AgentMiddleware):
 
 ---
 
-### 第五篇总结
+### 本篇总结
 
 **核心要点**:
 
@@ -1908,8 +1909,8 @@ class MetricsMiddleware(AgentMiddleware):
 **与其他篇章的联系**:
 
 - **第三篇(LangGraph)**: Middleware运行在LangGraph之上
-- **第四篇(Deep Agents)**: deepagents内置了TodoList等middleware
-- **第六篇(监控评估)**: Middleware可输出指标给LangSmith
+- **第七篇(Deep Agents)**: deepagents内置了TodoList等middleware
+- **第十篇(生产实践与监控评估)**: Middleware可输出指标给LangSmith
 
 **下一步**: 学习如何使用LangSmith追踪和评估Agent质量。
 

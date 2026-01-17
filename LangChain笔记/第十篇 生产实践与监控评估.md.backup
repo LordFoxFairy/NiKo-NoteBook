@@ -4807,6 +4807,434 @@ class DisasterRecovery:
 6. **生产清单**：全面的安全、性能、可靠性、监控、成本、合规检查清单
 
 ---
+
+# 第17章：测试与质量保证
+
+> **目标**：掌握LangChain应用的测试方法，构建可靠的生产系统
+
+在生产环境中，Agent的行为必须是**可预测**和**可验证**的。本章将深入讲解如何系统地测试LangChain应用，从单元测试到集成测试，再到性能测试和评估体系。
+
+---
+
+### 17.1 为什么需要测试
+
+#### 17.1.1 LLM应用的测试挑战
+
+**LLM应用测试的三大挑战**：
+
+1. **非确定性**：LLM输出不稳定，同样的输入可能产生不同输出
+2. **成本问题**：每次测试调用真实LLM都会产生费用
+3. **依赖外部服务**：需要网络、API Key、第三方服务等
+
+---
+
+### 17.2 单元测试
+
+#### 17.2.1 Mock LLM - GenericFakeChatModel
+
+**核心特点**：模拟LLM响应，实现确定性测试。
+
+```python
+import pytest
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage, HumanMessage
+
+def test_fake_llm_basic():
+    """测试基础的Fake LLM"""
+    # 创建Fake LLM(返回固定响应)
+    fake_llm = GenericFakeChatModel(messages=iter([
+        AIMessage(content="这是第一条响应"),
+        AIMessage(content="这是第二条响应"),
+    ]))
+
+    # 测试调用
+    response1 = fake_llm.invoke([HumanMessage(content="你好")])
+    assert response1.content == "这是第一条响应"
+
+    response2 = fake_llm.invoke([HumanMessage(content="再次问候")])
+    assert response2.content == "这是第二条响应"
+```
+
+#### 17.2.2 测试带工具调用的Agent
+
+```python
+from langchain.agents import create_agent
+from langchain_core.tools import tool
+from langgraph.checkpoint.memory import MemorySaver
+
+@tool
+def calculator(expression: str) -> float:
+    """安全的数学表达式计算器
+
+    支持基本运算: +, -, *, /, ()
+    不支持变量和函数调用,避免代码注入风险
+    """
+    import ast
+    import operator
+
+    # 允许的安全操作符
+    allowed_operators = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.Pow: operator.pow,
+        ast.USub: operator.neg,
+    }
+
+    def eval_node(node):
+        # Python 3.8+ 使用 ast.Constant 替代 ast.Num
+        if isinstance(node, ast.Constant):  # 数字 (Python 3.8+)
+            return node.value
+        elif isinstance(node, ast.Num):  # 数字 (向后兼容 Python 3.7)
+            return node.n
+        elif isinstance(node, ast.BinOp):  # 二元运算
+            if type(node.op) not in allowed_operators:
+                raise ValueError(f"不支持的运算符: {type(node.op).__name__}")
+            return allowed_operators[type(node.op)](
+                eval_node(node.left),
+                eval_node(node.right)
+            )
+        elif isinstance(node, ast.UnaryOp):  # 一元运算
+            if type(node.op) not in allowed_operators:
+                raise ValueError(f"不支持的运算符: {type(node.op).__name__}")
+            return allowed_operators[type(node.op)](eval_node(node.operand))
+        else:
+            raise ValueError(f"不支持的表达式类型: {type(node).__name__}")
+
+    try:
+        tree = ast.parse(expression, mode='eval')
+        return float(eval_node(tree.body))
+    except (ValueError, SyntaxError, TypeError) as e:
+        raise ValueError(f"表达式解析失败: {str(e)}")
+
+def test_agent_with_tool_call():
+    """测试Agent的工具调用行为"""
+    # 创建Fake LLM(模拟调用calculator工具)
+    fake_llm = GenericFakeChatModel(messages=iter([
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "id": "call_123",
+                "name": "calculator",
+                "args": {"expression": "2 + 3"}
+            }]
+        ),
+        AIMessage(content="计算结果是5")
+    ]))
+
+    # 创建Agent
+    agent = create_agent(
+        model=fake_llm,
+        tools=[calculator],
+        checkpointer=MemorySaver()
+    )
+
+    # 执行并验证
+    result = agent.invoke(
+        {"messages": [("user", "计算2+3")]},
+        {"configurable": {"thread_id": "test-1"}}
+    )
+
+    # 断言
+    messages = result["messages"]
+    assert messages[0].content == "计算2+3"
+    assert hasattr(messages[1], "tool_calls")
+    assert messages[1].tool_calls[0]["name"] == "calculator"
+```
+
+---
+
+### 17.3 集成测试
+
+#### 17.3.1 端到端Agent测试
+
+```python
+import pytest
+from langchain.agents import create_agent
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langgraph.checkpoint.memory import MemorySaver
+
+@tool
+def search(query: str) -> str:
+    """搜索工具"""
+    return f"搜索结果：{query}"
+
+@pytest.mark.integration
+def test_agent_e2e_flow():
+    """测试Agent完整执行流程(集成测试)"""
+    # 创建真实Agent(但使用便宜的模型)
+    agent = create_agent(
+        model=ChatOpenAI(model="gpt-4o-mini", temperature=0),
+        tools=[search],
+        checkpointer=MemorySaver()
+    )
+
+    # 测试多轮对话
+    thread_id = "integration-test-1"
+
+    # 第一轮：需要搜索
+    result1 = agent.invoke(
+        {"messages": [("user", "搜索LangChain的最新版本")]},
+        {"configurable": {"thread_id": thread_id}}
+    )
+
+    assert len(result1["messages"]) >= 3  # user + ai(tool_call) + tool + ai(final)
+
+    # 验证对话历史被保留
+    assert len(result1["messages"]) >= 3
+```
+
+---
+
+### 17.4 性能测试
+
+#### 17.4.1 延迟测试
+
+```python
+import time
+from statistics import mean
+
+def test_agent_latency():
+    """测试Agent响应延迟"""
+    agent = create_agent(
+        model=ChatOpenAI(model="gpt-4o-mini", temperature=0),
+        tools=[search],
+        checkpointer=MemorySaver()
+    )
+
+    latencies = []
+
+    # 运行10次测试
+    for i in range(10):
+        start = time.time()
+        agent.invoke(
+            {"messages": [("user", f"测试查询{i}")]},
+            {"configurable": {"thread_id": f"latency-{i}"}}
+        )
+        end = time.time()
+        latencies.append(end - start)
+
+    # 统计延迟
+    avg_latency = mean(latencies)
+    p95_latency = sorted(latencies)[int(len(latencies) * 0.95)]
+
+    print(f"\n延迟统计:")
+    print(f"  平均延迟: {avg_latency:.2f}s")
+    print(f"  P95延迟: {p95_latency:.2f}s")
+
+    # 断言性能要求
+    assert avg_latency < 5.0, f"平均延迟过高: {avg_latency:.2f}s"
+```
+
+---
+
+### 17.5 评估测试 - LangSmith
+
+#### 17.5.1 批量评估
+
+```python
+from langsmith import evaluate
+from langchain.agents import create_agent
+
+def agent_runner(inputs: dict, agent) -> dict:
+    """运行Agent"""
+    result = agent.invoke(
+        {"messages": [("user", inputs["question"])]},
+        {"configurable": {"thread_id": "eval"}}
+    )
+    return {"answer": result["messages"][-1].content}
+
+# 自定义评估器
+def answer_correctness(run, example) -> dict:
+    """评估回答正确性"""
+    expected = example.outputs["answer"].lower()
+    actual = run.outputs["answer"].lower()
+    score = 1.0 if expected in actual or actual in expected else 0.0
+    return {"score": score}
+
+# 运行评估
+results = evaluate(
+    agent_runner,
+    data="agent_qa_dataset",
+    evaluators=[answer_correctness],
+    experiment_prefix="agent_v1"
+)
+```
+
+---
+
+### 17.6 测试最佳实践
+
+#### 17.6.1 测试金字塔原则
+
+```python
+# ✅ 好的测试结构
+tests/
+├── unit/                    # 75% - 快速、稳定
+│   ├── test_tools.py
+│   ├── test_prompts.py
+│   └── test_utils.py
+├── integration/             # 20% - 中等速度
+│   ├── test_agent_flow.py
+│   └── test_rag_system.py
+└── e2e/                     # 5% - 慢但关键
+    └── test_production_scenarios.py
+```
+
+#### 17.6.2 成本控制策略
+
+| 策略 | 方法 | 节省成本 |
+|------|------|---------|
+| **使用Fake LLM** | GenericFakeChatModel | 100% |
+| **使用便宜模型** | gpt-4o-mini代替gpt-4o | 95% |
+| **并行执行** | pytest-xdist | 节省时间 |
+
+---
+
+### 17.7 总结
+
+#### 17.7.1 测试策略快速选择
+
+| 场景 | 推荐策略 | 关键工具 |
+|------|---------|---------|
+| **快速验证功能** | 单元测试 + Fake LLM | GenericFakeChatModel |
+| **验证Agent行为** | 集成测试 | pytest + MemorySaver |
+| **评估输出质量** | LLM-as-Judge | LangSmith |
+| **性能基准测试** | 延迟/吞吐量测试 | pytest-benchmark |
+
+#### 17.7.2 测试清单
+
+**开发阶段**：
+- [ ] 为每个新工具编写单元测试
+- [ ] 为每个Agent节点编写单元测试
+- [ ] 使用Fake LLM确保测试稳定
+- [ ] 达到80%+代码覆盖率
+
+**集成阶段**：
+- [ ] 编写端到端流程测试
+- [ ] 性能基准测试
+- [ ] 录制测试用例避免重复费用
+
+**发布阶段**：
+- [ ] 在真实LLM上运行评估
+- [ ] LangSmith回归测试
+- [ ] 所有CI检查通过
+
+---
+
+**本章关键代码**：
+
+```python
+# 生产级测试套件模板
+import pytest
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+from langchain.agents import create_agent
+from langchain_core.tools import tool
+from langgraph.checkpoint.memory import MemorySaver
+
+# ===== Fixtures =====
+@pytest.fixture
+def fake_llm():
+    return GenericFakeChatModel(messages=iter([
+        AIMessage(content="测试响应")
+    ]))
+
+@pytest.fixture
+def agent(fake_llm):
+    @tool
+    def search(query: str) -> str:
+        return f"搜索结果：{query}"
+
+    return create_agent(
+        model=fake_llm,
+        tools=[search],
+        checkpointer=MemorySaver()
+    )
+
+# ===== 单元测试 =====
+def test_tool_execution():
+    """测试工具执行"""
+    @tool
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    result = add.invoke({"a": 2, "b": 3})
+    assert result == 5
+
+# ===== 集成测试 =====
+@pytest.mark.integration
+def test_agent_flow(agent):
+    """测试Agent完整流程"""
+    result = agent.invoke(
+        {"messages": [("user", "测试")]},
+        {"configurable": {"thread_id": "test-1"}}
+    )
+    assert len(result["messages"]) > 0
+```
+
+配合**第16章的生产实践**和**第五篇的Middleware工程化**，你已经具备构建企业级LangChain应用的完整能力。
+
+---
+
+###思考与练习
+
+1. **思考**：在什么场景下应该选择 Serverless 而不是容器化部署？
+
+   <details>
+   <summary>答案</summary>
+
+   Serverless 适合：
+   - 请求量波动大的场景
+   - 偶发性任务
+   - 快速原型开发
+   - 成本敏感且使用量不大
+
+   容器化适合：
+   - 稳定高并发
+   - 需要持久连接
+   - 复杂的有状态服务
+   - 需要精细资源控制
+   </details>
+
+2. **练习**：设计一个能够自动降级的多层缓存系统。
+
+3. **思考**：如何在保证安全的前提下优化 PII 检测的性能？
+
+---
+
+## 结语
+
+恭喜你完成了 LangChain 1.0 的完整学习！从基础概念到生产实践，你已经掌握了构建生产级 AI 应用的核心技术。
+
+**下一步建议**：
+
+1. **实践项目**：选择一个真实场景，从零构建完整应用
+2. **深入研究**：关注 LangChain 社区最新发展
+3. **贡献开源**：参与 LangChain 生态建设
+4. **生产落地**：将所学应用到实际产品中
+
+**持续学习资源**：
+
+- [LangChain 官方文档](https://docs.langchain.com)
+- [LangChain GitHub](https://github.com/langchain-ai/langchain)
+- [LangChain Discord 社区](https://discord.gg/langchain)
+- [LangChain Blog](https://blog.langchain.com)
+
+祝你在 AI 应用开发的道路上越走越远！
+
+---
+
+> "The best way to predict the future is to invent it." - Alan Kay
+
+让我们一起用 LangChain 创造 AI 的未来！
+---
+
+
+---
+
 ## 第6章：测试与质量保障
 
 > **关注点**: 构建Agent的完整测试体系

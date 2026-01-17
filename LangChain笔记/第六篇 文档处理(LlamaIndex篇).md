@@ -47,11 +47,11 @@ graph LR
 
 ---
 
-# 第1章：LlamaIndex数据加载器生态
+## 第1章：LlamaIndex数据加载器生态
 
-## 1.1 SimpleDirectoryReader - 快速入门
+### 1.1 SimpleDirectoryReader - 快速入门
 
-### 1.1.1 基础使用
+#### 1.1.1 基础使用
 
 **SimpleDirectoryReader** 是LlamaIndex最简单的文档加载器，支持20+种文件格式：
 
@@ -76,7 +76,7 @@ for doc in documents[:2]:
 
 ---
 
-### 1.1.2 高级配置
+#### 1.1.2 高级配置
 
 ```python
 from llama_index.core import SimpleDirectoryReader
@@ -144,7 +144,7 @@ documents = reader.load_data()
 
 ---
 
-### 1.1.3 自定义文件加载器
+#### 1.1.3 自定义文件加载器
 
 ```python
 from llama_index.core import SimpleDirectoryReader
@@ -165,9 +165,9 @@ documents = reader.load_data()
 
 ---
 
-## 1.2 LlamaHub - 700+数据加载器
+### 1.2 LlamaHub - 700+数据加载器
 
-### 1.2.1 LlamaHub概述
+#### 1.2.1 LlamaHub概述
 
 **LlamaHub**是LlamaIndex的数据加载器注册中心，提供：
 - 700+预构建的数据加载器
@@ -178,7 +178,7 @@ documents = reader.load_data()
 
 ---
 
-### 1.2.2 常用加载器
+#### 1.2.2 常用加载器
 
 **PDF加载器**：
 ```python
@@ -213,7 +213,7 @@ documents = reader.load_data(file="webpage.html")
 
 ---
 
-### 1.2.3 数据库加载器
+#### 1.2.3 数据库加载器
 
 ```python
 # MongoDB加载器
@@ -241,7 +241,7 @@ documents = reader.load_data(
 
 ---
 
-### 1.2.4 API加载器
+#### 1.2.4 API加载器
 
 ```python
 # GitHub加载器
@@ -265,9 +265,9 @@ documents = reader.load_data(page_ids=["page-id-1", "page-id-2"])
 
 ---
 
-## 1.3 专用PDF加载器对比
+### 1.3 专用PDF加载器对比
 
-### 1.3.1 工具对比矩阵
+#### 1.3.1 工具对比矩阵
 
 | 工具 | 速度 | 准确率 | 表格支持 | 图片提取 | 适用场景 |
 |------|------|--------|---------|---------|---------|
@@ -278,7 +278,7 @@ documents = reader.load_data(page_ids=["page-id-1", "page-id-2"])
 
 ---
 
-### 1.3.2 对比示例
+#### 1.3.2 对比示例
 
 ```python
 from llama_index.readers.file import PDFReader, PyMuPDFReader
@@ -307,7 +307,7 @@ print(f"PyMuPDFReader平均文本长度：{sum(len(d.text) for d in docs2)/len(d
 
 ---
 
-## 小结
+### 小结
 
 **第1章核心要点**：
 
@@ -332,11 +332,11 @@ print(f"PyMuPDFReader平均文本长度：{sum(len(d.text) for d in docs2)/len(d
 
 ---
 
-# 第2章：LlamaParse - GenAI原生PDF解析
+## 第2章：LlamaParse - GenAI原生PDF解析
 
-## 2.1 LlamaParse简介
+### 2.1 LlamaParse简介
 
-### 2.1.1 什么是LlamaParse
+#### 2.1.1 什么是LlamaParse
 
 **LlamaParse** 是LlamaIndex推出的商业级PDF解析服务，核心特点：
 
@@ -359,7 +359,7 @@ print(f"PyMuPDFReader平均文本长度：{sum(len(d.text) for d in docs2)/len(d
 
 ---
 
-### 2.1.2 为什么需要LlamaParse
+#### 2.1.2 为什么需要LlamaParse
 
 **传统工具的局限**：
 ```python
@@ -386,9 +386,9 @@ print(f"PyMuPDFReader平均文本长度：{sum(len(d.text) for d in docs2)/len(d
 
 ---
 
-## 2.2 LlamaParse快速入门
+### 2.2 LlamaParse快速入门
 
-### 2.2.1 安装与配置
+#### 2.2.1 安装与配置
 
 ```bash
 # 安装llama-parse
@@ -411,7 +411,7 @@ os.environ["LLAMA_CLOUD_API_KEY"] = "llx-your-api-key"
 
 ---
 
-### 2.2.2 基础使用
+#### 2.2.2 基础使用
 
 ```python
 from llama_parse import LlamaParse
@@ -437,7 +437,7 @@ print(documents[0].text[:500])
 
 本文档介绍了...
 
-## 1.1 背景
+### 1.1 背景
 
 在过去的十年中...
 
@@ -452,7 +452,7 @@ print(documents[0].text[:500])
 
 ---
 
-### 2.2.3 高级配置
+#### 2.2.3 高级配置
 
 ```python
 from llama_parse import LlamaParse
@@ -487,9 +487,9 @@ documents = parser.load_data("academic_paper.pdf")
 
 ---
 
-## 2.3 LlamaParse高级特性
+### 2.3 LlamaParse高级特性
 
-### 2.3.1 自定义解析指令
+#### 2.3.1 自定义解析指令
 
 **场景1：学术论文**
 ```python
@@ -544,7 +544,7 @@ documents = parser.load_data("contract.pdf")
 
 ---
 
-### 2.3.2 表格处理
+#### 2.3.2 表格处理
 
 **LlamaParse的表格处理优势**：
 
@@ -591,7 +591,7 @@ print(f"提取到{len(tables)}个表格")
 
 ---
 
-### 2.3.3 多模态支持
+#### 2.3.3 多模态支持
 
 **图片提取与描述**：
 ```python
@@ -619,9 +619,9 @@ documents = parser.load_data("illustrated_document.pdf")
 
 ---
 
-## 2.4 LlamaParse vs 传统工具
+### 2.4 LlamaParse vs 传统工具
 
-### 2.4.1 实战对比
+#### 2.4.1 实战对比
 
 ```python
 import time
@@ -677,7 +677,7 @@ LlamaParse平均文本长度：1500字符（包含完整表格和结构）
 
 ---
 
-### 2.4.2 成本考量
+#### 2.4.2 成本考量
 
 **LlamaParse定价**（2025年数据）：
 - 免费额度：1000页/月
@@ -701,7 +701,7 @@ LlamaParse平均文本长度：1500字符（包含完整表格和结构）
    ```python
    # 一次解析多个文件（共享初始化成本）
    parser = LlamaParse(api_key="llx-your-api-key")
-
+   
    files = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
    all_docs = []
    for file in files:
@@ -711,9 +711,9 @@ LlamaParse平均文本长度：1500字符（包含完整表格和结构）
 
 ---
 
-## 2.5 集成到RAG系统
+### 2.5 集成到RAG系统
 
-### 2.5.1 完整示例
+#### 2.5.1 完整示例
 
 ```python
 from llama_parse import LlamaParse
@@ -768,9 +768,9 @@ for i, node in enumerate(response.source_nodes, 1):
 
 ---
 
-## 2.6 MinerU vs LlamaParse - 深度对比
+### 2.6 MinerU vs LlamaParse - 深度对比
 
-### 2.6.1 核心定位对比
+#### 2.6.1 核心定位对比
 
 **LlamaParse - GenAI原生商业解析**：
 - **定位**：世界首个GenAI原生文档解析平台
@@ -788,7 +788,7 @@ for i, node in enumerate(response.source_nodes, 1):
 
 ---
 
-### 2.6.2 功能对比矩阵
+#### 2.6.2 功能对比矩阵
 
 | 功能维度 | LlamaParse | MinerU | 说明 |
 |---------|-----------|--------|------|
@@ -804,7 +804,7 @@ for i, node in enumerate(response.source_nodes, 1):
 
 ---
 
-### 2.6.3 性能基准对比
+#### 2.6.3 性能基准对比
 
 **解析准确率（基于OmniDocBench基准测试）**：
 
@@ -841,7 +841,7 @@ for i, node in enumerate(response.source_nodes, 1):
 
 ---
 
-### 2.6.4 适用场景决策树
+#### 2.6.4 适用场景决策树
 
 ```mermaid
 graph TD
@@ -887,7 +887,7 @@ graph TD
 
 ---
 
-### 2.6.5 混合使用策略
+#### 2.6.5 混合使用策略
 
 **策略1：智能路由（基于文档特征）**
 
@@ -1097,7 +1097,7 @@ docs = robust_parse_with_retry("problematic_document.pdf")
 
 ---
 
-### 2.6.6 最佳实践建议
+#### 2.6.6 最佳实践建议
 
 **1. 组合使用场景**：
 
@@ -1212,7 +1212,7 @@ if (
 - **成果**：2周内完成POC，成功融资后再考虑成本优化
 
 ---
-## 小结
+### 小结
 
 **第2章核心要点**：
 
@@ -1269,7 +1269,33 @@ print(f"Nodes: {len(nodes)}个")
 
 ---
 
-### 3.1.2 为什么需要Node Parser
+## 第3章：Node Parser - 智能分块策略
+
+### 3.1 Node Parser基础
+
+#### 3.1.1 Node vs Document
+
+**Document vs Node**：
+- **Document**：从数据源加载的原始文档（可能很大）
+- **Node**：Document分块后的单元，用于索引和检索（大小可控）
+
+```python
+from llama_index.core import SimpleDirectoryReader
+from llama_index.core.node_parser import SentenceSplitter
+
+# Document: 原始文档
+documents = SimpleDirectoryReader("./data").load_data()
+print(f"加载 {len(documents)} 个Documents")
+print(f"第一个Document长度: {len(documents[0].text)} 字符")
+
+# Node: 分块后的单元
+parser = SentenceSplitter(chunk_size=512)
+nodes = parser.get_nodes_from_documents(documents)
+print(f"分块为 {len(nodes)} 个Nodes")
+print(f"第一个Node长度: {len(nodes[0].text)} 字符")
+```
+
+#### 3.1.2 为什么需要Node Parser
 
 **挑战**：
 1. **Embedding限制**：模型有token限制
@@ -1283,9 +1309,9 @@ print(f"Nodes: {len(nodes)}个")
 
 ---
 
-## 3.2 SentenceSplitter（推荐）
+### 3.2 SentenceSplitter（推荐）
 
-### 3.2.1 基础使用
+#### 3.2.1 基础使用
 
 ```python
 from llama_index.core.node_parser import SentenceSplitter
@@ -1313,7 +1339,7 @@ for node in nodes[:2]:
 
 ---
 
-### 3.2.2 参数调优
+#### 3.2.2 参数调优
 
 ```python
 from llama_index.core.node_parser import SentenceSplitter
@@ -1355,9 +1381,9 @@ print(f"大chunk: {len(large_nodes)}个")
 
 ---
 
-## 3.3 其他Node Parser
+### 3.3 其他Node Parser
 
-### 3.3.1 SemanticSplitterNodeParser
+#### 3.3.1 SemanticSplitterNodeParser
 
 **基于语义相似度分块**：
 
@@ -1392,7 +1418,7 @@ print(f"语义分块：{len(nodes)}个节点")
 
 ---
 
-### 3.3.2 MarkdownNodeParser
+#### 3.3.2 MarkdownNodeParser
 
 **专为Markdown优化**：
 
@@ -1420,7 +1446,7 @@ for node in nodes[:3]:
 
 ---
 
-### 3.3.3 CodeSplitter
+#### 3.3.3 CodeSplitter
 
 **专为代码文档优化**：
 
@@ -1448,7 +1474,7 @@ print(f"代码分块：{len(nodes)}个节点")
 
 ---
 
-### 3.3.4 HierarchicalNodeParser
+#### 3.3.4 HierarchicalNodeParser
 
 **层级分块（多粒度）**：
 
@@ -1477,9 +1503,9 @@ index = VectorStoreIndex(leaf_nodes)
 
 ---
 
-## 3.4 Metadata提取
+### 3.4 Metadata提取
 
-### 3.4.1 自动提取元数据
+#### 3.4.1 自动提取元数据
 
 ```python
 from llama_index.core.node_parser import SentenceSplitter
@@ -1521,7 +1547,7 @@ for node in nodes[:2]:
 
 ---
 
-### 3.4.2 自定义元数据
+#### 3.4.2 自定义元数据
 
 ```python
 from llama_index.core.node_parser import SentenceSplitter
@@ -1545,7 +1571,7 @@ for node in nodes[:2]:
 
 ---
 
-## 3.5 分块质量评估
+### 3.5 分块质量评估
 
 ```python
 def evaluate_nodes(nodes: list) -> dict:
@@ -1578,7 +1604,7 @@ print(f"质量评估：{stats['quality']}")
 
 ---
 
-## 小结
+### 小结
 
 **第3章核心要点**：
 
@@ -1605,11 +1631,11 @@ print(f"质量评估：{stats['quality']}")
 
 ---
 
-# 第4章：多模态文档处理
+## 第4章：多模态文档处理
 
-## 4.1 图片提取与理解
+### 4.1 图片提取与理解
 
-### 4.1.1 基础图片提取
+#### 4.1.1 基础图片提取
 
 ```python
 from llama_index.core import SimpleDirectoryReader
@@ -1642,7 +1668,7 @@ for doc in documents:
 
 ---
 
-### 4.1.2 多模态Embedding
+#### 4.1.2 多模态Embedding
 
 **使用CLIP等多模态模型**：
 
@@ -1674,9 +1700,9 @@ print(response.response)
 
 ---
 
-## 4.2 表格处理
+### 4.2 表格处理
 
-### 4.2.1 LlamaParse表格提取
+#### 4.2.1 LlamaParse表格提取
 
 **LlamaParse的表格优势**（已在第2章介绍）：
 
@@ -1724,7 +1750,7 @@ for i, table in enumerate(tables[:2], 1):
 
 ---
 
-### 4.2.2 表格转结构化数据
+#### 4.2.2 表格转结构化数据
 
 ```python
 import pandas as pd
@@ -1766,9 +1792,9 @@ for i, table_md in enumerate(tables[:2], 1):
 
 ---
 
-## 4.3 图表理解（Charts & Diagrams）
+### 4.3 图表理解（Charts & Diagrams）
 
-### 4.3.1 使用GPT-4o理解图表
+#### 4.3.1 使用GPT-4o理解图表
 
 ```python
 from llama_parse import LlamaParse
@@ -1805,7 +1831,7 @@ print(response.response)
 
 ---
 
-### 4.3.2 专用图表工具（ChartReader）
+#### 4.3.2 专用图表工具（ChartReader）
 
 ```python
 # 假设有一个专用的ChartReader（社区工具）
@@ -1848,9 +1874,9 @@ prompt = f"""
 
 ---
 
-## 4.4 多模态RAG完整示例
+### 4.4 多模态RAG完整示例
 
-### 4.4.1 构建多模态知识库
+#### 4.4.1 构建多模态知识库
 
 ```python
 from llama_parse import LlamaParse
@@ -1911,7 +1937,7 @@ for query in queries:
 
 ---
 
-## 小结
+### 小结
 
 **第4章核心要点**：
 
@@ -1936,11 +1962,11 @@ for query in queries:
 
 ---
 
-# 第5章：生产级文档处理Pipeline
+## 第5章：生产级文档处理Pipeline
 
-## 5.1 Pipeline设计
+### 5.1 Pipeline设计
 
-### 5.1.1 完整流程
+#### 5.1.1 完整流程
 
 ```
 文档输入
@@ -1966,7 +1992,7 @@ RAG系统
 
 ---
 
-### 5.1.2 完整实现
+#### 5.1.2 完整实现
 
 ```python
 from typing import List, Dict
@@ -2136,9 +2162,9 @@ print("索引构建完成")
 
 ---
 
-## 5.2 批量处理与质量控制
+### 5.2 批量处理与质量控制
 
-### 5.2.1 批量处理
+#### 5.2.1 批量处理
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -2182,7 +2208,7 @@ print(f"\n总计处理：{len(all_documents)}个文档")
 
 ---
 
-### 5.2.2 质量检测
+#### 5.2.2 质量检测
 
 ```python
 def assess_document_quality(documents: List[Document]) -> Dict:
@@ -2242,7 +2268,7 @@ print(f"总字符数：{quality['total_chars']}")
 
 ---
 
-## 5.3 完整RAG系统
+### 5.3 完整RAG系统
 
 ```python
 from llama_index.core import VectorStoreIndex
@@ -2299,9 +2325,9 @@ for query in queries:
 
 ---
 
-## 5.4 成本优化策略
+### 5.4 成本优化策略
 
-### 5.4.1 混合策略
+#### 5.4.1 混合策略
 
 ```python
 class CostOptimizedProcessor(DocumentProcessor):
@@ -2351,7 +2377,7 @@ print(f"本月LlamaParse使用：${cost_processor.llamaparse_usage:.2f}")
 
 ---
 
-### 5.4.2 缓存策略
+#### 5.4.2 缓存策略
 
 ```python
 import hashlib
@@ -2410,7 +2436,7 @@ docs2 = cached_processor.process_document("document.pdf")
 
 ## 全篇总结
 
-**第十一篇（LlamaIndex篇）涵盖技术**：
+**本篇（文档处理 LlamaIndex篇）涵盖技术**：
 
 | 章节 | 核心技术 | 适用场景 |
 |------|---------|---------|
@@ -2491,5 +2517,5 @@ docs2 = cached_processor.process_document("document.pdf")
 - **成本敏感** → LangChain + Unstructured.io
 - **混合使用** → 简单文档用LangChain，复杂文档用LlamaParse
 
-**下一篇预告**：
-第十二篇将聚焦**提示工程与上下文优化**，提升RAG系统的生成质量和成本效率。
+**下一步学习**：
+后续章节将聚焦**Deep Agents、Middleware 工程化、多Agent协作**等高级主题。

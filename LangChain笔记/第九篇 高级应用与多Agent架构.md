@@ -4104,7 +4104,7 @@ class CustomTool(BaseTool):
 
 ---
 
-# 第16章：Long-term Memory 架构设计
+## 第3章：Long-term Memory 架构设计
 
 > **目标**：掌握长期记忆系统设计，实现跨会话的知识积累和个性化体验
 
@@ -4112,7 +4112,7 @@ class CustomTool(BaseTool):
 
 ---
 
-### 16.1 为什么需要 Long-term Memory
+### 3.1 为什么需要 Long-term Memory
 
 #### 3.1.1 短期记忆的局限
 
@@ -4148,7 +4148,7 @@ agent.invoke({"messages": [("user", "我喜欢什么?")]}, config=config2)
 
 ---
 
-### 16.2 Long-term Memory 架构
+### 3.2 Long-term Memory 架构
 
 #### 3.2.1 混合记忆架构
 
@@ -4476,7 +4476,7 @@ class AdvancedLongTermMemory:
 
 ---
 
-### 16.3 实战：个性化助手
+### 3.3 实战：个性化助手
 
 #### 3.3.1 集成长期记忆到Agent
 
@@ -4553,7 +4553,7 @@ response2 = agent.invoke("推荐一本书给我", thread_id="session-2")
 
 ---
 
-### 16.4 高级特性
+### 3.4 高级特性
 
 #### 3.4.1 记忆优先级
 
@@ -4623,7 +4623,7 @@ class ForgettableMemory:
 
 ---
 
-### 16.5 最佳实践
+### 3.5 最佳实践
 
 #### 3.5.1 记忆类型分层
 
@@ -4668,7 +4668,7 @@ class OptimizedMemory:
 
 ---
 
-### 16.6 总结
+### 3.6 总结
 
 #### 3.6.1 核心要点
 
@@ -4697,14 +4697,1123 @@ class OptimizedMemory:
 
 ---
 
+## 第4章：Agent 交互协议
+
+> **关注点**：理解 Agent 生态的三大协议标准，掌握 AG-UI 和 A2A 的实战应用。
+
+随着 AI Agent 生态的成熟，三大交互协议逐渐成为行业标准：
+
+- **MCP (Model Context Protocol)**: Agent ↔ 工具/数据（已在 2.3 节详解）
+- **AG-UI (Agent-User Interaction Protocol)**: Agent ↔ 用户界面
+- **A2A (Agent-to-Agent Protocol)**: Agent ↔ Agent 跨系统协作
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Agent 协议生态                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌──────────────┐                                          │
+│   │   用户界面    │◄────── AG-UI ──────►┌──────────────┐    │
+│   │  (Web/App)   │      (事件流)        │    Agent     │    │
+│   └──────────────┘                      │   (主体)     │    │
+│                                         └──────┬───────┘    │
+│                                                │             │
+│                         ┌──────────────────────┼──────────┐ │
+│                         │                      │          │ │
+│                         ▼                      ▼          ▼ │
+│                  ┌──────────────┐       ┌──────────────┐    │
+│                  │  MCP Server  │       │ Other Agent  │    │
+│                  │  (工具/数据)  │◄─MCP─►│   (协作)     │    │
+│                  └──────────────┘       └──────────────┘    │
+│                                                ▲            │
+│                                                │            │
+│                                            A2A │            │
+│                                         (JSON-RPC)          │
+│                                                │            │
+│                                      ┌─────────▼────────┐   │
+│                                      │  External Agent  │   │
+│                                      │  (跨系统/跨公司)  │   │
+│                                      └──────────────────┘   │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.1 协议对比与选型
+
+| 特性 | MCP (Anthropic) | AG-UI | A2A (Google) |
+|------|-----------------|-------|--------------|
+| **连接方向** | Agent → 工具/数据 | Agent ↔ 用户界面 | Agent ↔ Agent |
+| **主要用途** | 工具调用、数据访问 | 实时UI交互 | 跨系统Agent协作 |
+| **通信协议** | JSON-RPC | 事件流 (SSE) | JSON-RPC 2.0 |
+| **状态管理** | 无状态 | 共享状态 | 任务状态 |
+| **流式支持** | ✅ | ✅ 原生 | ✅ (SSE) |
+| **人机交互** | 工具级别 | 原生支持 | 通过任务 |
+| **多模态** | 工具返回 | 原生支持 | 文件/媒体 |
+
+**选型建议**：
+
+- **构建聊天UI**：使用 AG-UI
+- **调用外部工具**：使用 MCP
+- **多Agent协作**：使用 A2A
+
+---
+
+### 4.2 AG-UI 协议详解
+
+AG-UI (Agent-User Interaction Protocol) 是一个开放、轻量级、基于事件的协议，标准化 AI Agent 与用户界面之间的连接。
+
+#### 4.2.1 核心概念
+
+**事件类型**：
+
+| 类别 | 事件 | 用途 |
+|------|------|------|
+| **生命周期** | RunStarted, RunFinished, RunError | 监控Agent运行状态 |
+| **文本消息** | TextMessageStart → Content → End | 流式文本传输 |
+| **工具调用** | ToolCallStart → Args → End → Result | 工具执行追踪 |
+| **状态管理** | StateSnapshot, StateDelta | 前后端状态同步 |
+
+**流式模式**：
+
+```
+# 文本消息流式传输
+TextMessageStart(messageId, role)
+    → TextMessageContent(delta="Hello")
+    → TextMessageContent(delta=" World")
+    → TextMessageEnd()
+
+# 工具调用流式传输
+ToolCallStart(toolCallId, toolCallName)
+    → ToolCallArgs(delta='{"query":')
+    → ToolCallArgs(delta='"weather"}')
+    → ToolCallEnd()
+    → ToolCallResult(content="晴天, 25°C")
+```
+
+#### 4.2.2 Python SDK 使用
+
+**安装**：
+
+```bash
+pip install ag-ui-core
+```
+
+**基础事件定义**：
+
+```python
+from dataclasses import dataclass
+from typing import Optional, Literal
+from enum import Enum
+
+class EventType(str, Enum):
+    """AG-UI 事件类型"""
+    RUN_STARTED = "RUN_STARTED"
+    RUN_FINISHED = "RUN_FINISHED"
+    RUN_ERROR = "RUN_ERROR"
+    TEXT_MESSAGE_START = "TEXT_MESSAGE_START"
+    TEXT_MESSAGE_CONTENT = "TEXT_MESSAGE_CONTENT"
+    TEXT_MESSAGE_END = "TEXT_MESSAGE_END"
+    TOOL_CALL_START = "TOOL_CALL_START"
+    TOOL_CALL_ARGS = "TOOL_CALL_ARGS"
+    TOOL_CALL_END = "TOOL_CALL_END"
+    TOOL_CALL_RESULT = "TOOL_CALL_RESULT"
+    STATE_SNAPSHOT = "STATE_SNAPSHOT"
+    STATE_DELTA = "STATE_DELTA"
+
+@dataclass
+class BaseEvent:
+    """基础事件"""
+    type: EventType
+    timestamp: Optional[str] = None
+
+@dataclass
+class TextMessageContentEvent(BaseEvent):
+    """文本内容事件"""
+    message_id: str
+    delta: str  # 增量文本
+
+@dataclass
+class ToolCallStartEvent(BaseEvent):
+    """工具调用开始事件"""
+    tool_call_id: str
+    tool_call_name: str
+```
+
+#### 4.2.3 与 LangGraph 集成
+
+**创建 AG-UI 兼容的 Agent 服务器**：
+
+```python
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from langgraph.graph import StateGraph, MessagesState
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_agent
+import json
+import asyncio
+from typing import AsyncGenerator
+
+app = FastAPI()
+
+# 创建 LangGraph Agent
+def create_chat_agent():
+    model = ChatOpenAI(model="gpt-4o-mini")
+
+    def chat_node(state: MessagesState):
+        response = model.invoke(state["messages"])
+        return {"messages": [response]}
+
+    builder = StateGraph(MessagesState)
+    builder.add_node("chat", chat_node)
+    builder.set_entry_point("chat")
+    builder.set_finish_point("chat")
+
+    return builder.compile()
+
+agent = create_chat_agent()
+
+async def generate_agui_events(
+    user_message: str,
+    thread_id: str
+) -> AsyncGenerator[str, None]:
+    """生成 AG-UI 兼容的事件流"""
+    import uuid
+
+    run_id = str(uuid.uuid4())
+    message_id = str(uuid.uuid4())
+
+    # 1. 发送 RUN_STARTED
+    yield f"data: {json.dumps({
+        'type': 'RUN_STARTED',
+        'threadId': thread_id,
+        'runId': run_id
+    })}\n\n"
+
+    # 2. 发送 TEXT_MESSAGE_START
+    yield f"data: {json.dumps({
+        'type': 'TEXT_MESSAGE_START',
+        'messageId': message_id,
+        'role': 'assistant'
+    })}\n\n"
+
+    # 3. 流式输出内容
+    config = {"configurable": {"thread_id": thread_id}}
+
+    async for event in agent.astream_events(
+        {"messages": [{"role": "user", "content": user_message}]},
+        config=config,
+        version="v2"
+    ):
+        if event["event"] == "on_chat_model_stream":
+            chunk = event["data"]["chunk"]
+            if hasattr(chunk, "content") and chunk.content:
+                yield f"data: {json.dumps({
+                    'type': 'TEXT_MESSAGE_CONTENT',
+                    'messageId': message_id,
+                    'delta': chunk.content
+                })}\n\n"
+                await asyncio.sleep(0.01)  # 控制流速
+
+    # 4. 发送 TEXT_MESSAGE_END
+    yield f"data: {json.dumps({
+        'type': 'TEXT_MESSAGE_END',
+        'messageId': message_id
+    })}\n\n"
+
+    # 5. 发送 RUN_FINISHED
+    yield f"data: {json.dumps({
+        'type': 'RUN_FINISHED',
+        'threadId': thread_id,
+        'runId': run_id
+    })}\n\n"
+
+@app.post("/chat")
+async def chat(request: dict):
+    """AG-UI 兼容的聊天端点"""
+    user_message = request.get("message", "")
+    thread_id = request.get("threadId", "default")
+
+    return StreamingResponse(
+        generate_agui_events(user_message, thread_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+```
+
+**前端消费示例 (JavaScript)**：
+
+```javascript
+async function chat(message, threadId) {
+    const response = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, threadId })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const lines = decoder.decode(value).split('\n');
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const event = JSON.parse(line.slice(6));
+                handleAGUIEvent(event);
+            }
+        }
+    }
+}
+
+function handleAGUIEvent(event) {
+    switch (event.type) {
+        case 'RUN_STARTED':
+            console.log('Agent 开始运行:', event.runId);
+            break;
+        case 'TEXT_MESSAGE_CONTENT':
+            // 追加文本到 UI
+            appendText(event.delta);
+            break;
+        case 'TOOL_CALL_START':
+            showToolCallIndicator(event.toolCallName);
+            break;
+        case 'RUN_FINISHED':
+            console.log('Agent 运行完成');
+            break;
+        case 'RUN_ERROR':
+            showError(event.message);
+            break;
+    }
+}
+```
+
+---
+
+### 4.3 A2A 协议详解
+
+A2A (Agent-to-Agent Protocol) 是 Google 贡献的开放协议，现为 Linux 基金会项目，实现不同 AI Agent 之间的通信和互操作。
+
+#### 4.3.1 核心概念
+
+**设计目标**：
+
+1. **打破孤岛**：连接不同生态系统中的 Agent
+2. **启用复杂协作**：专业化 Agent 协同处理复杂任务
+3. **保持不透明性**：协作时无需暴露内部状态和实现
+
+**核心组件**：
+
+| 组件 | 描述 |
+|------|------|
+| **Agent Card** | 描述 Agent 能力和连接信息的元数据 |
+| **Task** | 一次完整的 Agent 执行单元 |
+| **Context** | 跨多个 Task 的对话线程 |
+| **Message** | Agent 间交换的消息 |
+
+**Agent Card 示例**：
+
+```json
+{
+    "name": "Weather Agent",
+    "description": "提供全球天气查询服务",
+    "version": "1.0.0",
+    "capabilities": ["weather_query", "forecast"],
+    "endpoint": "https://weather-agent.example.com/a2a",
+    "authentication": {
+        "type": "bearer",
+        "token_url": "https://auth.example.com/token"
+    },
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "location": {"type": "string"},
+            "date": {"type": "string", "format": "date"}
+        }
+    }
+}
+```
+
+#### 4.3.2 FastA2A + Pydantic AI 实现
+
+Pydantic AI 通过 FastA2A 库提供了 A2A 协议的完整实现，这是目前最简洁的 A2A 实现方式。
+
+**安装**：
+
+```bash
+# 方式1: 单独安装 FastA2A
+pip install fasta2a
+
+# 方式2: 通过 Pydantic AI 安装
+pip install 'pydantic-ai-slim[a2a]'
+```
+
+**最简实现 - 一行代码暴露 A2A 服务**：
+
+```python
+from pydantic_ai import Agent
+
+# 定义 Agent
+agent = Agent(
+    'openai:gpt-4o',
+    instructions='你是一个有帮助的助手，擅长回答各种问题。'
+)
+
+# 一行代码转换为 A2A 服务器
+app = agent.to_a2a()
+
+# 运行: uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+**完整示例 - 带工具的 A2A Agent**：
+
+```python
+from pydantic_ai import Agent, RunContext
+from pydantic import BaseModel
+from datetime import date
+import httpx
+
+# 定义输出结构
+class WeatherResponse(BaseModel):
+    location: str
+    temperature: float
+    condition: str
+    humidity: int
+
+# 创建 Agent
+weather_agent = Agent(
+    'openai:gpt-4o',
+    instructions='''你是天气查询助手。
+    当用户询问天气时，使用 get_weather 工具获取信息。
+    始终用中文回复。''',
+    output_type=WeatherResponse
+)
+
+@weather_agent.tool
+async def get_weather(ctx: RunContext, location: str) -> dict:
+    """获取指定位置的天气信息
+
+    Args:
+        location: 城市名称，如 "北京"、"上海"
+    """
+    # 实际应用中调用天气 API
+    # 这里使用模拟数据
+    weather_data = {
+        "北京": {"temp": 22, "condition": "晴", "humidity": 45},
+        "上海": {"temp": 26, "condition": "多云", "humidity": 65},
+        "广州": {"temp": 30, "condition": "阵雨", "humidity": 80},
+    }
+
+    data = weather_data.get(location, {"temp": 20, "condition": "未知", "humidity": 50})
+    return {
+        "location": location,
+        "temperature": data["temp"],
+        "condition": data["condition"],
+        "humidity": data["humidity"]
+    }
+
+# 转换为 A2A 应用
+app = weather_agent.to_a2a()
+```
+
+**运行和测试**：
+
+```bash
+# 启动服务
+uvicorn weather_agent:app --host 0.0.0.0 --port 8000
+
+# 测试 Agent Card 端点
+curl http://localhost:8000/.well-known/agent.json
+
+# 发送任务请求
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": {
+      "role": "user",
+      "content": "北京今天天气怎么样？"
+    }
+  }'
+```
+
+#### 4.3.3 自定义 FastA2A 配置
+
+**配置存储和任务队列**：
+
+```python
+from fasta2a import FastA2A, InMemoryStorage, InMemoryBroker
+from pydantic_ai import Agent
+
+agent = Agent('openai:gpt-4o', instructions='你是助手')
+
+# 自定义配置
+storage = InMemoryStorage()  # 生产环境可用 PostgresStorage, RedisStorage
+broker = InMemoryBroker()    # 生产环境可用 RedisBroker
+
+# 创建 FastA2A 应用
+a2a_app = FastA2A(
+    agent=agent,
+    storage=storage,
+    broker=broker,
+    name="My Custom Agent",
+    description="自定义 A2A Agent 服务",
+    version="1.0.0"
+)
+
+app = a2a_app.app
+```
+
+**多 Agent A2A 协作**：
+
+```python
+from pydantic_ai import Agent
+from httpx import AsyncClient
+
+# Agent 1: 研究助手
+research_agent = Agent(
+    'openai:gpt-4o',
+    instructions='你是研究助手，负责收集和整理信息。'
+)
+
+# Agent 2: 写作助手
+writing_agent = Agent(
+    'openai:gpt-4o',
+    instructions='你是写作助手，根据研究结果撰写内容。'
+)
+
+@writing_agent.tool
+async def consult_research_agent(ctx: RunContext, query: str) -> str:
+    """咨询研究助手获取信息
+
+    Args:
+        query: 需要研究的问题
+    """
+    async with AsyncClient() as client:
+        # 调用研究 Agent 的 A2A 端点
+        response = await client.post(
+            "http://research-agent:8001/tasks",
+            json={
+                "message": {
+                    "role": "user",
+                    "content": query
+                }
+            }
+        )
+        result = response.json()
+        return result.get("output", "无法获取研究结果")
+
+# 各自暴露为 A2A 服务
+research_app = research_agent.to_a2a()
+writing_app = writing_agent.to_a2a()
+```
+
+#### 4.3.4 A2A 与 LangGraph 集成
+
+**将 LangGraph Agent 暴露为 A2A 服务**：
+
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel
+from langgraph.graph import StateGraph, MessagesState
+from langgraph.checkpoint.memory import InMemorySaver
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_agent
+from typing import Optional
+import uuid
+
+app = FastAPI()
+
+# 创建 LangGraph Agent
+def build_agent():
+    model = ChatOpenAI(model="gpt-4o-mini")
+
+    def agent_node(state: MessagesState):
+        response = model.invoke(state["messages"])
+        return {"messages": [response]}
+
+    builder = StateGraph(MessagesState)
+    builder.add_node("agent", agent_node)
+    builder.set_entry_point("agent")
+    builder.set_finish_point("agent")
+
+    return builder.compile(checkpointer=InMemorySaver())
+
+agent = build_agent()
+
+# A2A Agent Card
+@app.get("/.well-known/agent.json")
+async def get_agent_card():
+    return {
+        "name": "LangGraph Assistant",
+        "description": "基于 LangGraph 构建的智能助手",
+        "version": "1.0.0",
+        "capabilities": ["chat", "reasoning"],
+        "endpoint": "/tasks"
+    }
+
+# A2A 任务请求模型
+class TaskRequest(BaseModel):
+    message: dict
+    context_id: Optional[str] = None
+
+class TaskResponse(BaseModel):
+    task_id: str
+    context_id: str
+    output: str
+    status: str
+
+# A2A 任务端点
+@app.post("/tasks", response_model=TaskResponse)
+async def create_task(request: TaskRequest):
+    task_id = str(uuid.uuid4())
+    context_id = request.context_id or str(uuid.uuid4())
+
+    # 执行 LangGraph Agent
+    config = {"configurable": {"thread_id": context_id}}
+
+    result = await agent.ainvoke(
+        {"messages": [request.message]},
+        config=config
+    )
+
+    # 提取输出
+    last_message = result["messages"][-1]
+    output = last_message.content if hasattr(last_message, "content") else str(last_message)
+
+    return TaskResponse(
+        task_id=task_id,
+        context_id=context_id,
+        output=output,
+        status="completed"
+    )
+```
+
+---
+
+## 第5章：多 Agent 高级模式
+
+> **关注点**：掌握 Handoffs 和 Skills 两种高级多 Agent 协作模式。
+
+本章补充第1章未覆盖的两种重要多 Agent 模式，与已有的 Supervisor-Worker 模式形成完整的模式体系。
+
+### 5.1 模式对比与选型
+
+| 模式 | 控制方式 | 状态共享 | 并行能力 | 用户交互 | 适用场景 |
+|------|---------|---------|---------|---------|---------|
+| **Supervisor-Worker** | 集中式 | 经监督者 | 可并行 | 低 | 任务分解、批量处理 |
+| **Subagents** | 工具调用 | 隔离 | 高并行 | 低 | 独立子任务、模块化 |
+| **Handoffs** | 状态转移 | 直接传递 | 顺序 | 高 | 专业升级、客服系统 |
+| **Skills** | 单Agent | 全局 | 中等 | 高 | 多领域问答、知识切换 |
+| **Router** | 分类路由 | 隔离 | 高并行 | 中等 | 意图分类、负载分发 |
+
+**选型决策树**：
+
+```
+需要多 Agent 协作？
+├── 否 → 单 Agent + 工具
+└── 是 → Agent 间需要共享完整上下文？
+    ├── 否 → 任务可并行？
+    │   ├── 是 → Subagents 或 Router
+    │   └── 否 → Supervisor-Worker
+    └── 是 → 需要专业升级/转接？
+        ├── 是 → Handoffs
+        └── 否 → Skills
+```
+
+---
+
+### 5.2 Handoffs 模式详解
+
+Handoffs（交接）模式通过状态转移实现 Agent 间的控制权传递，特别适合需要"专业升级"的场景。
+
+#### 5.2.1 核心概念
+
+**工作原理**：
+
+```
+用户 → Agent A (通用) → 检测到专业问题 → Handoff → Agent B (专家)
+                                                      ↓
+用户 ← 最终回复 ←────────────────────────────────────┘
+```
+
+**与 Supervisor 的区别**：
+
+| 特性 | Supervisor | Handoffs |
+|------|-----------|----------|
+| 控制流 | 中央集中 | 分布式传递 |
+| 状态 | 经监督者 | 直接传递 |
+| 回退 | 回到监督者 | 可回退到前一个 |
+| 适用 | 任务分解 | 专业升级 |
+
+#### 5.2.2 LangGraph 实现
+
+```python
+from langgraph.graph import StateGraph, MessagesState, END
+from langgraph.types import Command
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, AIMessage
+from typing import Literal, TypedDict
+from dataclasses import dataclass
+
+# 定义状态
+class HandoffState(MessagesState):
+    current_agent: str
+    handoff_reason: str | None
+
+# 定义 Handoff 命令
+@dataclass
+class Handoff:
+    target: str
+    reason: str
+
+# 通用客服 Agent
+def general_support_agent(state: HandoffState) -> Command[Literal["technical", "billing", "__end__"]]:
+    """通用客服 Agent，处理简单问题或转接专家"""
+    model = ChatOpenAI(model="gpt-4o-mini")
+
+    system_prompt = """你是通用客服助手。
+
+    职责：
+    1. 处理简单的问候和通用问题
+    2. 识别需要专业帮助的问题并转接
+
+    转接规则：
+    - 技术问题（代码、API、错误）→ 回复 [HANDOFF:technical]
+    - 账单问题（付款、退款、订阅）→ 回复 [HANDOFF:billing]
+    - 其他问题 → 直接回答
+    """
+
+    messages = [{"role": "system", "content": system_prompt}] + state["messages"]
+    response = model.invoke(messages)
+    content = response.content
+
+    # 检测是否需要转接
+    if "[HANDOFF:technical]" in content:
+        return Command(
+            goto="technical",
+            update={
+                "messages": [AIMessage(content="正在为您转接技术专家...")],
+                "current_agent": "technical",
+                "handoff_reason": "技术问题"
+            }
+        )
+    elif "[HANDOFF:billing]" in content:
+        return Command(
+            goto="billing",
+            update={
+                "messages": [AIMessage(content="正在为您转接账务专家...")],
+                "current_agent": "billing",
+                "handoff_reason": "账务问题"
+            }
+        )
+    else:
+        return Command(
+            goto="__end__",
+            update={
+                "messages": [response],
+                "current_agent": "general"
+            }
+        )
+
+# 技术支持 Agent
+def technical_support_agent(state: HandoffState) -> Command[Literal["general", "__end__"]]:
+    """技术支持专家"""
+    model = ChatOpenAI(model="gpt-4o")
+
+    system_prompt = """你是技术支持专家，擅长：
+    - 代码调试和错误排查
+    - API 使用指导
+    - 系统架构建议
+
+    如果问题不属于技术范畴，回复 [HANDOFF:general] 转回通用客服。
+    """
+
+    messages = [{"role": "system", "content": system_prompt}] + state["messages"]
+    response = model.invoke(messages)
+
+    if "[HANDOFF:general]" in response.content:
+        return Command(
+            goto="general",
+            update={
+                "messages": [AIMessage(content="这个问题我来帮您转接通用客服...")],
+                "current_agent": "general"
+            }
+        )
+
+    return Command(
+        goto="__end__",
+        update={"messages": [response]}
+    )
+
+# 账务支持 Agent
+def billing_support_agent(state: HandoffState) -> Command[Literal["general", "__end__"]]:
+    """账务支持专家"""
+    model = ChatOpenAI(model="gpt-4o")
+
+    system_prompt = """你是账务支持专家，擅长：
+    - 账单查询和解释
+    - 退款处理流程
+    - 订阅管理
+
+    如果问题不属于账务范畴，回复 [HANDOFF:general] 转回通用客服。
+    """
+
+    messages = [{"role": "system", "content": system_prompt}] + state["messages"]
+    response = model.invoke(messages)
+
+    if "[HANDOFF:general]" in response.content:
+        return Command(
+            goto="general",
+            update={
+                "messages": [AIMessage(content="这个问题我来帮您转接通用客服...")],
+                "current_agent": "general"
+            }
+        )
+
+    return Command(
+        goto="__end__",
+        update={"messages": [response]}
+    )
+
+# 构建工作流
+def build_handoff_workflow():
+    builder = StateGraph(HandoffState)
+
+    # 添加节点
+    builder.add_node("general", general_support_agent)
+    builder.add_node("technical", technical_support_agent)
+    builder.add_node("billing", billing_support_agent)
+
+    # 设置入口
+    builder.set_entry_point("general")
+
+    return builder.compile()
+
+# 使用示例
+async def main():
+    workflow = build_handoff_workflow()
+
+    # 测试技术问题
+    result = await workflow.ainvoke({
+        "messages": [HumanMessage(content="我的 API 调用返回 401 错误，怎么解决？")],
+        "current_agent": "general",
+        "handoff_reason": None
+    })
+
+    for msg in result["messages"]:
+        print(f"{msg.__class__.__name__}: {msg.content}")
+```
+
+---
+
+### 5.3 Skills 模式详解
+
+Skills（技能）模式让单个 Agent 动态加载不同的专业能力，无需创建多个 Agent 实例。
+
+#### 5.3.1 核心概念
+
+**工作原理**：
+
+```
+用户问题 → Agent → 识别领域 → 加载对应 Skill → 使用专业 prompt/工具 → 回复
+                      ↓
+              ┌───────┴───────┐
+              ↓       ↓       ↓
+           SQL技能  Python技能  通用技能
+```
+
+**优势**：
+
+- 减少 Agent 实例和通信开销
+- 上下文完全共享
+- 切换速度快
+
+#### 5.3.2 实现方式
+
+```python
+from langgraph.graph import StateGraph, MessagesState, END
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.tools import tool
+from typing import TypedDict, Callable
+from dataclasses import dataclass
+
+# 定义技能
+@dataclass
+class Skill:
+    name: str
+    description: str
+    system_prompt: str
+    tools: list[Callable]
+
+# SQL 技能
+@tool
+def execute_sql(query: str) -> str:
+    """执行 SQL 查询（模拟）"""
+    # 实际应用中连接数据库
+    return f"执行查询: {query}\n结果: [模拟数据]"
+
+sql_skill = Skill(
+    name="sql",
+    description="SQL 数据库查询和分析",
+    system_prompt="""你是 SQL 专家。
+    - 帮助用户编写和优化 SQL 查询
+    - 解释查询结果
+    - 使用 execute_sql 工具执行查询""",
+    tools=[execute_sql]
+)
+
+# Python 技能
+@tool
+def execute_python(code: str) -> str:
+    """执行 Python 代码（模拟）"""
+    # 实际应用中使用沙箱执行
+    return f"执行代码:\n{code}\n输出: [模拟结果]"
+
+python_skill = Skill(
+    name="python",
+    description="Python 编程和数据处理",
+    system_prompt="""你是 Python 专家。
+    - 帮助用户编写 Python 代码
+    - 解释代码逻辑
+    - 使用 execute_python 工具运行代码""",
+    tools=[execute_python]
+)
+
+# 通用技能
+general_skill = Skill(
+    name="general",
+    description="通用问答和闲聊",
+    system_prompt="你是一个友好的助手，可以回答各种问题。",
+    tools=[]
+)
+
+# 技能注册表
+SKILLS = {
+    "sql": sql_skill,
+    "python": python_skill,
+    "general": general_skill
+}
+
+# 状态定义
+class SkillState(MessagesState):
+    current_skill: str
+    skill_history: list[str]
+
+# 技能路由器
+def skill_router(state: SkillState) -> str:
+    """根据用户输入选择合适的技能"""
+    model = ChatOpenAI(model="gpt-4o-mini")
+
+    last_message = state["messages"][-1].content
+
+    router_prompt = f"""分析用户问题，选择最合适的技能。
+
+可用技能：
+- sql: SQL 数据库相关问题
+- python: Python 编程相关问题
+- general: 其他通用问题
+
+用户问题: {last_message}
+
+只回复技能名称（sql/python/general）："""
+
+    response = model.invoke([{"role": "user", "content": router_prompt}])
+    skill_name = response.content.strip().lower()
+
+    return skill_name if skill_name in SKILLS else "general"
+
+# 技能执行器
+def skill_executor(state: SkillState) -> dict:
+    """使用当前技能处理用户请求"""
+    skill = SKILLS[state["current_skill"]]
+
+    # 创建带工具的模型
+    model = ChatOpenAI(model="gpt-4o-mini")
+    if skill.tools:
+        model = model.bind_tools(skill.tools)
+
+    # 构建消息
+    messages = [
+        SystemMessage(content=skill.system_prompt),
+        *state["messages"]
+    ]
+
+    # 执行
+    response = model.invoke(messages)
+
+    # 处理工具调用
+    if hasattr(response, "tool_calls") and response.tool_calls:
+        tool_results = []
+        for tool_call in response.tool_calls:
+            tool_fn = next(t for t in skill.tools if t.name == tool_call["name"])
+            result = tool_fn.invoke(tool_call["args"])
+            tool_results.append(f"工具 {tool_call['name']} 结果: {result}")
+
+        # 再次调用获取最终回复
+        messages.append(response)
+        messages.append(HumanMessage(content="\n".join(tool_results)))
+        response = model.invoke(messages)
+
+    return {
+        "messages": [response],
+        "skill_history": state.get("skill_history", []) + [state["current_skill"]]
+    }
+
+# 构建工作流
+def build_skill_workflow():
+    builder = StateGraph(SkillState)
+
+    # 路由节点
+    def route_and_update(state: SkillState) -> dict:
+        selected_skill = skill_router(state)
+        return {"current_skill": selected_skill}
+
+    builder.add_node("router", route_and_update)
+    builder.add_node("executor", skill_executor)
+
+    # 边
+    builder.set_entry_point("router")
+    builder.add_edge("router", "executor")
+    builder.add_edge("executor", END)
+
+    return builder.compile()
+
+# 使用示例
+async def main():
+    workflow = build_skill_workflow()
+
+    # 测试 SQL 问题
+    result = await workflow.ainvoke({
+        "messages": [HumanMessage(content="如何查询用户表中年龄大于 25 的记录？")],
+        "current_skill": "",
+        "skill_history": []
+    })
+
+    print(f"使用技能: {result['current_skill']}")
+    print(f"回复: {result['messages'][-1].content}")
+
+    # 测试 Python 问题
+    result = await workflow.ainvoke({
+        "messages": [HumanMessage(content="用 Python 写一个快速排序算法")],
+        "current_skill": "",
+        "skill_history": []
+    })
+
+    print(f"使用技能: {result['current_skill']}")
+    print(f"回复: {result['messages'][-1].content}")
+```
+
+#### 5.3.3 高级 Skills 模式：动态技能注册
+
+```python
+from typing import Protocol, runtime_checkable
+from abc import abstractmethod
+
+@runtime_checkable
+class SkillProtocol(Protocol):
+    """技能协议"""
+    name: str
+    description: str
+
+    @abstractmethod
+    def get_system_prompt(self) -> str: ...
+
+    @abstractmethod
+    def get_tools(self) -> list: ...
+
+class SkillRegistry:
+    """技能注册表"""
+
+    def __init__(self):
+        self._skills: dict[str, SkillProtocol] = {}
+
+    def register(self, skill: SkillProtocol) -> None:
+        """注册技能"""
+        self._skills[skill.name] = skill
+
+    def unregister(self, name: str) -> None:
+        """注销技能"""
+        self._skills.pop(name, None)
+
+    def get(self, name: str) -> SkillProtocol | None:
+        """获取技能"""
+        return self._skills.get(name)
+
+    def list_skills(self) -> list[dict]:
+        """列出所有技能"""
+        return [
+            {"name": s.name, "description": s.description}
+            for s in self._skills.values()
+        ]
+
+    def create_router_prompt(self) -> str:
+        """生成路由提示词"""
+        skills_desc = "\n".join(
+            f"- {s.name}: {s.description}"
+            for s in self._skills.values()
+        )
+        return f"""根据用户问题选择最合适的技能。
+
+可用技能：
+{skills_desc}
+
+只回复技能名称："""
+
+# 全局注册表
+skill_registry = SkillRegistry()
+
+# 注册默认技能
+skill_registry.register(sql_skill)
+skill_registry.register(python_skill)
+skill_registry.register(general_skill)
+```
+
+---
+
+### 本章小结
+
+#### 5.4.1 核心要点
+
+1. **AG-UI 协议**：标准化 Agent 与 UI 的交互，支持流式传输
+2. **A2A 协议**：实现跨系统 Agent 协作，保护内部实现
+3. **Handoffs 模式**：状态驱动的专业升级转接
+4. **Skills 模式**：单 Agent 动态能力切换
+
+#### 5.4.2 选型建议
+
+| 需求 | 推荐方案 |
+|------|---------|
+| 构建聊天 UI | AG-UI + LangGraph |
+| 跨系统 Agent 调用 | A2A (FastA2A) |
+| 客服专业转接 | Handoffs |
+| 多领域问答 | Skills |
+| 任务并行处理 | Subagents 或 Router |
+
+#### 5.4.3 实施清单
+
+- [ ] 评估是否需要跨系统协作（→ A2A）
+- [ ] 确定 UI 交互需求（→ AG-UI）
+- [ ] 选择合适的多 Agent 模式
+- [ ] 实现协议适配层
+- [ ] 添加监控和错误处理
+
+---
+
 ## 总结
 
-第七篇涵盖了 LangChain 生态的高级应用：
+本篇涵盖了 LangChain 生态的高级应用：
 
-- **多 Agent 系统设计模式**
+- **多 Agent 系统设计模式**（Supervisor-Worker、Subagents、Handoffs、Skills、Router）
 - **多模态 AI 应用开发**
 - **实时流式交互实现**
-- **MCP 协议集成**
+- **MCP 协议集成**（Agent ↔ 工具/数据）
+- **AG-UI 协议集成**（Agent ↔ 用户界面）
+- **A2A 协议集成**（Agent ↔ Agent 跨系统协作）
 - **自定义组件开发**
 
 这些高级特性让你能够构建更复杂、更强大的 AI 应用系统。
@@ -4715,4 +5824,8 @@ class OptimizedMemory:
 
 - [LangGraph 官方文档](https://langchain-ai.github.io/langgraph/)
 - [MCP 协议规范](https://modelcontextprotocol.io)
+- [AG-UI 协议文档](https://docs.ag-ui.com)
+- [A2A 协议规范](https://a2a-protocol.org)
+- [Pydantic AI 文档](https://ai.pydantic.dev)
+- [FastA2A 文档](https://ai.pydantic.dev/a2a/)
 - [LangChain 多模态指南](https://python.langchain.com/docs/use_cases/multimodal)

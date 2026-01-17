@@ -61,11 +61,11 @@ graph LR
 
 ---
 
-# 第1章：LangChain Document Loaders
+## 第1章：LangChain Document Loaders
 
-## 1.1 Document Loaders概述
+### 1.1 Document Loaders概述
 
-### 1.1.1 核心概念
+#### 1.1.1 核心概念
 
 **Document Loaders** 是LangChain中用于加载各种格式文档的统一接口：
 
@@ -91,7 +91,7 @@ for doc in loader.lazy_load():
 
 ---
 
-### 1.1.2 PDF类型分类
+#### 1.1.2 PDF类型分类
 
 **Type 1: 原生PDF（Text-based PDF）**
 ```python
@@ -125,9 +125,9 @@ print(f"提取到{len(pages)}页文本")
 
 ---
 
-## 1.2 PDF Loaders对比
+### 1.2 PDF Loaders对比
 
-### 1.2.1 基础工具对比
+#### 1.2.1 基础工具对比
 
 ```python
 from langchain_community.document_loaders import (
@@ -177,7 +177,7 @@ print(f"PyMuPDFLoader: {len(docs3)}页, {time3:.2f}s")
 
 ---
 
-### 1.2.2 工具选择决策树
+#### 1.2.2 工具选择决策树
 
 ```
 PDF文档类型
@@ -195,9 +195,9 @@ PDF文档类型
 
 ---
 
-## 1.3 实战：表格提取
+### 1.3 实战：表格提取
 
-### 1.3.1 PDFPlumber表格提取
+#### 1.3.1 PDFPlumber表格提取
 
 ```python
 import pdfplumber
@@ -266,7 +266,7 @@ for table in tables[:2]:
 
 ---
 
-### 1.3.2 集成到RAG系统
+#### 1.3.2 集成到RAG系统
 
 ```python
 from langchain_community.document_loaders import PDFPlumberLoader
@@ -338,9 +338,9 @@ print(result["messages"][-1].content)
 
 ---
 
-## 1.4 PDF处理最佳实践
+### 1.4 PDF处理最佳实践
 
-### 1.4.1 预处理检查
+#### 1.4.1 预处理检查
 
 ```python
 import fitz  # PyMuPDF
@@ -400,7 +400,7 @@ else:
 
 ---
 
-### 1.4.2 错误处理与降级策略
+#### 1.4.2 错误处理与降级策略
 
 ```python
 from typing import Optional, List
@@ -466,7 +466,7 @@ else:
 
 ---
 
-## 小结
+### 小结
 
 **第1章核心要点**：
 
@@ -491,11 +491,11 @@ else:
 
 ---
 
-# 第2章：OCR技术集成
+## 第2章：OCR技术集成
 
-## 2.1 OCR技术概述
+### 2.1 OCR技术概述
 
-### 2.1.1 什么是OCR
+#### 2.1.1 什么是OCR
 
 **OCR（Optical Character Recognition，光学字符识别）**：
 ```
@@ -510,7 +510,7 @@ else:
 
 ---
 
-### 2.1.2 OCR工具对比
+#### 2.1.2 OCR工具对比
 
 | 工具 | 准确率 | 速度 | 多语言 | 成本 | 适用场景 |
 |------|--------|------|--------|------|---------|
@@ -522,9 +522,9 @@ else:
 
 ---
 
-## 2.2 Tesseract OCR集成
+### 2.2 Tesseract OCR集成
 
-### 2.2.1 安装与配置
+#### 2.2.1 安装与配置
 
 ```bash
 # 安装Tesseract
@@ -542,7 +542,7 @@ sudo apt-get install tesseract-ocr-chi-sim  # Ubuntu
 pip install pytesseract pillow pdf2image
 ```
 
-### 2.2.2 基础OCR示例
+#### 2.2.2 基础OCR示例
 
 ```python
 import pytesseract
@@ -585,7 +585,7 @@ print(text_mixed[:200])
 
 ---
 
-### 2.2.3 集成到LangChain
+#### 2.2.3 集成到LangChain
 
 ```python
 from langchain_core.documents import Document
@@ -650,9 +650,9 @@ print(f"是否使用OCR：{docs[0].metadata.get('ocr', False)}")
 
 ---
 
-## 2.3 PaddleOCR集成（中文优秀）
+### 2.3 PaddleOCR集成（中文优秀）
 
-### 2.3.1 安装与配置
+#### 2.3.1 安装与配置
 
 ```bash
 # 安装PaddleOCR
@@ -662,7 +662,7 @@ pip install paddleocr paddlepaddle
 pip install paddlepaddle-gpu
 ```
 
-### 2.3.2 基础使用
+#### 2.3.2 基础使用
 
 ```python
 from paddleocr import PaddleOCR
@@ -736,7 +736,7 @@ for doc in docs[:2]:
 
 ---
 
-### 2.3.3 表格识别
+#### 2.3.3 表格识别
 
 ```python
 from paddleocr import PPStructure
@@ -812,9 +812,9 @@ for table in tables[:2]:
 
 ---
 
-## 2.4 云OCR服务集成
+### 2.4 云OCR服务集成
 
-### 2.4.1 Google Cloud Vision API
+#### 2.4.1 Google Cloud Vision API
 
 ```python
 from google.cloud import vision
@@ -841,7 +841,7 @@ def google_ocr(image_path: str) -> str:
 
 ---
 
-### 2.4.2 AWS Textract（表格识别强）
+#### 2.4.2 AWS Textract（表格识别强）
 
 ```python
 import boto3
@@ -878,7 +878,7 @@ def aws_textract(pdf_path: str) -> dict:
 
 ---
 
-### 2.4.3 成本对比
+#### 2.4.3 成本对比
 
 | 服务 | 定价 | 免费额度 | 适用场景 |
 |------|------|---------|---------|
@@ -899,12 +899,12 @@ def aws_textract(pdf_path: str) -> dict:
 
 ---
 
-## 2.4 MinerU - 学术文档专用解析器
+### 2.4 MinerU - 学术文档专用解析器
 
 > **版本信息**: MinerU 2.6.4+ (2025-11-04更新)
 > **项目地址**: https://github.com/opendatalab/MinerU
 
-### 2.4.1 MinerU简介
+#### 2.4.1 MinerU简介
 
 **MinerU** 是由OpenDataLab开发的专业文档解析工具，特别针对**学术论文PDF**进行优化。它在InternLM大模型预训练过程中开发，专为将复杂PDF转换为机器可读格式而设计。
 
@@ -928,7 +928,7 @@ def aws_textract(pdf_path: str) -> dict:
 
 ---
 
-### 2.4.2 安装方法
+#### 2.4.2 安装方法
 
 ```bash
 # 基础安装（CPU版本）
@@ -948,7 +948,7 @@ mineru download-models
 
 ---
 
-### 2.4.3 基础使用示例
+#### 2.4.3 基础使用示例
 
 ```python
 import subprocess
@@ -1046,7 +1046,7 @@ else:
 
 ---
 
-### 2.4.4 与LangChain集成
+#### 2.4.4 与LangChain集成
 
 ```python
 from langchain_core.documents import Document
@@ -1184,7 +1184,7 @@ for doc in documents[:3]:
 
 ---
 
-### 2.4.5 高级特性：公式与表格提取
+#### 2.4.5 高级特性：公式与表格提取
 
 ```python
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -1237,7 +1237,7 @@ print(f"向量库构建完成，共 {len(all_splits)} 个chunk")
 
 ---
 
-### 2.4.6 适用场景对比
+#### 2.4.6 适用场景对比
 
 **何时使用MinerU**：
 
@@ -1252,7 +1252,7 @@ print(f"向量库构建完成，共 {len(all_splits)} 个chunk")
 
 ---
 
-### 2.4.7 成本与性能分析
+#### 2.4.7 成本与性能分析
 
 **成本对比**：
 
@@ -1298,12 +1298,12 @@ print(f"Unstructured: {len(docs3)}个文档块, {time3:.2f}秒")
 
 ---
 
-## 2.5 DeepSeek Janus - 多模态理解（实验性）
+### 2.5 DeepSeek Janus - 多模态理解（实验性）
 
 > **版本信息**: Janus-Pro 1B/7B (2025最新)
 > **项目地址**: https://github.com/deepseek-ai/Janus
 
-### 2.5.1 DeepSeek Janus简介
+#### 2.5.1 DeepSeek Janus简介
 
 **Janus** 是DeepSeek推出的统一多模态模型，同时支持**视觉理解**和**图像生成**。虽然不是专门的OCR工具，但其强大的视觉理解能力可用于文档图像的文字识别和理解。
 
@@ -1325,7 +1325,7 @@ print(f"Unstructured: {len(docs3)}个文档块, {time3:.2f}秒")
 
 ---
 
-### 2.5.2 安装与配置
+#### 2.5.2 安装与配置
 
 ```bash
 # 克隆仓库
@@ -1346,7 +1346,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 
 ---
 
-### 2.5.3 基础OCR示例
+#### 2.5.3 基础OCR示例
 
 ```python
 import torch
@@ -1428,7 +1428,7 @@ print(text)
 
 ---
 
-### 2.5.4 表格理解示例
+#### 2.5.4 表格理解示例
 
 ```python
 def extract_table_with_janus(image_path: str) -> str:
@@ -1490,7 +1490,7 @@ print(table)
 
 ---
 
-### 2.5.5 与LangChain集成
+#### 2.5.5 与LangChain集成
 
 ```python
 from langchain_core.documents import Document
@@ -1601,7 +1601,7 @@ print("向量库构建完成")
 
 ---
 
-### 2.5.6 与PaddleOCR性能对比
+#### 2.5.6 与PaddleOCR性能对比
 
 ```python
 import time
@@ -1645,7 +1645,7 @@ print(f"Janus:     ~90-95% (复杂场景，尤其手写体)")
 
 ---
 
-## 小结
+### 小结
 
 **第2章核心要点**：
 
@@ -1678,9 +1678,9 @@ print(f"Janus:     ~90-95% (复杂场景，尤其手写体)")
 
 ---
 
-# 第3章：Unstructured.io统一处理框架
+## 第3章：Unstructured.io统一处理框架
 
-## 3.1 Unstructured.io简介
+### 3.1 Unstructured.io简介
 
 **核心优势**：
 - ✅ 支持30+文件格式（PDF, DOCX, HTML, MD, CSV...）
@@ -1689,7 +1689,7 @@ print(f"Janus:     ~90-95% (复杂场景，尤其手写体)")
 - ✅ 表格、图片自动提取
 - ✅ 与LangChain无缝集成
 
-### 3.1.1 安装
+#### 3.1.1 安装
 
 ```bash
 # 基础安装
@@ -1704,9 +1704,9 @@ pip install "unstructured[pdf]"
 
 ---
 
-## 3.2 基础使用
+### 3.2 基础使用
 
-### 3.2.1 自动检测与处理
+#### 3.2.1 自动检测与处理
 
 ```python
 from langchain_community.document_loaders import UnstructuredFileLoader
@@ -1721,7 +1721,7 @@ for doc in documents[:2]:
     print(f"内容：{doc.page_content[:150]}...")
 ```
 
-### 3.2.2 分块策略
+#### 3.2.2 分块策略
 
 ```python
 from langchain_community.document_loaders import UnstructuredFileLoader
@@ -1758,9 +1758,9 @@ for doc in documents[:5]:
 
 ---
 
-## 3.3 高级特性
+### 3.3 高级特性
 
-### 3.3.1 表格提取
+#### 3.3.1 表格提取
 
 ```python
 from unstructured.partition.pdf import partition_pdf
@@ -1792,7 +1792,7 @@ print(f"提取到{len(texts)}个文本块")
 
 ---
 
-### 3.3.2 集成到RAG系统
+#### 3.3.2 集成到RAG系统
 
 ```python
 from langchain_community.document_loaders import UnstructuredFileLoader
@@ -1861,9 +1861,9 @@ print(result["messages"][-1].content)
 
 ---
 
-## 3.4 性能优化
+### 3.4 性能优化
 
-### 3.4.1 批量处理
+#### 3.4.1 批量处理
 
 ```python
 from pathlib import Path
@@ -1911,7 +1911,7 @@ print(f"\n总计处理：{len(all_documents)}个文档块")
 
 ---
 
-## 小结
+### 小结
 
 **第3章核心要点**：
 
@@ -1937,9 +1937,9 @@ print(f"\n总计处理：{len(all_documents)}个文档块")
 
 ---
 
-# 第4章：Text Splitters - 智能分块策略
+## 第4章：Text Splitters - 智能分块策略
 
-## 4.1 为什么需要Text Splitters
+### 4.1 为什么需要Text Splitters
 
 **问题场景**：
 ```python
@@ -1962,9 +1962,9 @@ print(f"第一页字符数：{len(docs[0].page_content)}")  # 输出：5000+
 
 ---
 
-## 4.2 RecursiveCharacterTextSplitter
+### 4.2 RecursiveCharacterTextSplitter
 
-### 4.2.1 基础使用
+#### 4.2.1 基础使用
 
 ```python
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -1992,7 +1992,7 @@ print(f"第一个chunk：\n{splits[0].page_content[:200]}")
 
 ---
 
-### 4.2.2 工作原理
+#### 4.2.2 工作原理
 
 **递归分割策略**：
 ```python
@@ -2015,7 +2015,7 @@ separators = [
 
 ---
 
-### 4.2.3 参数调优
+#### 4.2.3 参数调优
 
 ```python
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -2058,9 +2058,9 @@ print(f"长chunk: {len(long_splits)}个")
 
 ---
 
-## 4.3 其他Text Splitters
+### 4.3 其他Text Splitters
 
-### 4.3.1 CharacterTextSplitter
+#### 4.3.1 CharacterTextSplitter
 
 ```python
 from langchain_text_splitters import CharacterTextSplitter
@@ -2081,7 +2081,7 @@ splits = splitter.split_documents(documents)
 
 ---
 
-### 4.3.2 TokenTextSplitter
+#### 4.3.2 TokenTextSplitter
 
 ```python
 from langchain_text_splitters import TokenTextSplitter
@@ -2101,7 +2101,7 @@ splits = splitter.split_documents(documents)
 
 ---
 
-### 4.3.3 MarkdownHeaderTextSplitter
+#### 4.3.3 MarkdownHeaderTextSplitter
 
 ```python
 from langchain_text_splitters import MarkdownHeaderTextSplitter
@@ -2137,7 +2137,7 @@ for split in splits:
 
 ---
 
-### 4.3.4 HTMLHeaderTextSplitter
+#### 4.3.4 HTMLHeaderTextSplitter
 
 ```python
 from langchain_text_splitters import HTMLHeaderTextSplitter
@@ -2166,9 +2166,9 @@ splits = splitter.split_text(html_text)
 
 ---
 
-## 4.4 实战：多级分块策略
+### 4.4 实战：多级分块策略
 
-### 4.4.1 组合使用Splitters
+#### 4.4.1 组合使用Splitters
 
 ```python
 from langchain_community.document_loaders import UnstructuredFileLoader
@@ -2204,7 +2204,7 @@ print(f"最终chunk：{len(final_splits)}个")
 
 ---
 
-### 4.4.2 语义分块（Semantic Chunking）
+#### 4.4.2 语义分块（Semantic Chunking）
 
 ```python
 from langchain_text_splitters import SemanticChunker
@@ -2237,7 +2237,7 @@ print(f"语义分块：{len(splits)}个")
 
 ---
 
-## 4.5 分块质量评估
+### 4.5 分块质量评估
 
 ```python
 def evaluate_chunking(chunks: list) -> dict:
@@ -2271,7 +2271,7 @@ print(f"质量评估：{stats['quality']}")
 
 ---
 
-## 小结
+### 小结
 
 **第4章核心要点**：
 
@@ -2296,11 +2296,11 @@ print(f"质量评估：{stats['quality']}")
 
 ---
 
-# 第5章：生产级文档处理Pipeline
+## 第5章：生产级文档处理Pipeline
 
-## 5.1 Pipeline设计
+### 5.1 Pipeline设计
 
-### 5.1.1 完整流程
+#### 5.1.1 完整流程
 
 ```
 文档输入
@@ -2326,7 +2326,7 @@ RAG系统
 
 ---
 
-### 5.1.2 完整实现
+#### 5.1.2 完整实现
 
 ```python
 from typing import List, Dict, Optional
@@ -2474,9 +2474,9 @@ print("向量库构建完成")
 
 ---
 
-## 5.2 智能文档路由策略
+### 5.2 智能文档路由策略
 
-### 5.2.1 DocumentRouter实现
+#### 5.2.1 DocumentRouter实现
 
 基于文档类型和特征，自动选择最佳处理工具：
 
@@ -2757,7 +2757,7 @@ for file_path in test_files:
 
 ---
 
-### 5.2.2 路由策略可视化
+#### 5.2.2 路由策略可视化
 
 ```python
 def visualize_routing_decision():
@@ -2801,7 +2801,7 @@ visualize_routing_decision()
 
 ---
 
-### 5.2.3 批量路由处理
+#### 5.2.3 批量路由处理
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -2916,7 +2916,7 @@ print(f"\n向量库构建完成，共{len(splits)}个chunk")
 
 ---
 
-### 5.2.4 性能对比实验
+#### 5.2.4 性能对比实验
 
 ```python
 import time
@@ -2999,9 +2999,9 @@ for strategy, files in benchmark_results.items():
 
 ---
 
-## 5.3 文档质量检测
+### 5.3 文档质量检测
 
-### 5.3.1 质量评分
+#### 5.3.1 质量评分
 
 ```python
 def assess_document_quality(documents: List[Document]) -> Dict:
@@ -3063,7 +3063,7 @@ print(f"总字符数：{quality['total_chars']}")
 
 ---
 
-## 5.3 完整RAG系统示例
+### 5.3 完整RAG系统示例
 
 ```python
 from langchain.agents import create_agent
@@ -3133,9 +3133,9 @@ print(result["messages"][-1].content)
 
 ---
 
-## 全篇总结
+### 全篇总结
 
-**第十一篇（LangChain篇）涵盖技术**：
+**本篇（文档处理 LangChain篇）涵盖技术**：
 
 | 章节 | 核心技术 | 适用场景 |
 |------|---------|---------|
@@ -3199,5 +3199,5 @@ print(result["messages"][-1].content)
 - ✅ Text Splitters智能分块
 - ✅ 生产级文档处理Pipeline
 
-**下一篇预告**：
-第十二篇将聚焦**提示工程与上下文优化**，提升RAG系统的生成质量和成本效率。
+**下一步学习**：
+后续章节将聚焦**Deep Agents、Middleware 工程化、多Agent协作**等高级主题。
