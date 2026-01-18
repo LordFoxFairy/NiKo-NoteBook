@@ -1,12 +1,4 @@
-# 第五篇补充：RAG高级篇 (LlamaIndex)
-
-> **版本要求**:
-> - llama-index-core: 0.14.8
-> - llama-index-llms-openai: 0.2.0+
-> - llama-index-retrievers-bm25: 最新版
-> - llama-index-postprocessor-cohere-rerank: 最新版
-> - Python: 3.10+
-> - 更新日期: 2025-11-29
+# 第五篇：RAG高级篇 (LlamaIndex)
 
 ## 概述
 

@@ -1,14 +1,4 @@
-# 第四篇补充：RAG基础篇 (LlamaIndex)
-
-> **版本要求**:
-> - LlamaIndex: 0.14.8
-> - llama-index-core: 0.14.8
-> - llama-index-llms-openai: 0.2.0+
-> - llama-index-embeddings-openai: 0.2.0+
-> - Python: 3.10+
-> - 更新日期: 2025-11-29
-
----
+# 第四篇：RAG基础篇 (LlamaIndex)
 
 ## 📋 前置准备
 

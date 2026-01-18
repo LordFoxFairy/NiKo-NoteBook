@@ -1,14 +1,5 @@
 # 第四篇：RAG基础篇
 
-> **版本要求**:
-> - LangChain: 1.0.7+
-> - langchain-community: 0.4.1+
-> - langchain-openai: 1.0.3+
-> - langchain-chroma: 0.2.0+
-> - langchain-text-splitters: 0.4.0+
-> - Python: 3.10+
-> - 更新日期: 2025-11-23
-
 ---
 
 ## 📋 前置准备
