@@ -284,7 +284,35 @@ main_graph.add_conditional_edges("supervisor", router_logic, {"code": "coding_ex
 - **解耦**：Coding Agent 可以由团队 A 维护，Main Agent 由团队 B 维护。
 - **复用**：同一个 Search Agent 可以被多个不同的主图调用。
 
-### 5.2 运行时配置 (Configuration)
+### 5.2 动态并行 (Map-Reduce with Send)
+
+LangGraph 不仅支持静态的并行（A->B, A->C），还支持动态的并行（Map-Reduce）。
+例如：你有 10 个 PDF 文档需要总结，但这 10 个数量是动态的。
+
+使用 `Send` API，我们可以在运行时分发任务：
+
+```python
+from langgraph.types import Send
+
+# 1. Map 步骤：生成任务列表
+def map_node(state: State):
+    subjects = state["subjects"] # ["AI", "Python", "Rust"]
+    # 为每个 subject 生成一个 Send 对象
+    # Send(节点名, 节点需要的State)
+    return [Send("generate_joke", {"subject": s}) for s in subjects]
+
+# 2. Worker 节点：处理单个任务
+def generate_joke(state: WorkerState):
+    return {"jokes": [f"Joke about {state['subject']}"]}
+
+# 3. 注册 Conditional Edge
+# map_node -> 动态分发给 generate_joke
+workflow.add_conditional_edges("map_node", map_node)
+```
+
+这让 LangGraph 能够处理大规模的数据处理流水线。
+
+### 5.3 运行时配置 (Configuration)
 
 硬编码模型参数是生产环境的大忌。LangGraph 允许通过 `configurable` 字典在运行时透传参数。
 
