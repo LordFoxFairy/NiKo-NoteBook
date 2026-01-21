@@ -1,6 +1,6 @@
 *.claude
 .langchain_backups
-大模型专项应用/*
+大模型专项应用
 实践笔记/*
 图像算法笔记/*
 **/tmp
