@@ -1,6 +1,10 @@
 *.claude
 .langchain_backups
-*GitHub项目深度调研汇总.md
-*前沿技术补充2025.md
-*完成汇总.md
-*CLAUDE.md
+大模型专项应用/*
+实践笔记/*
+图像算法笔记/*
+**/tmp
+**/.claude
+**.txt
+**backup**
+.idea

@@ -2,345 +2,283 @@
 
 ---
 
-## 📌 前置思考：为什么我们需要图？
+## 📌 本篇概要
 
-在 **第二篇** 中，我们体验了快速构建 Agent 带来的便利。它像一个黑盒，我们将 LLM 和 Tools 扔进去，它就能自动运行。
+本篇将深入 LangGraph 的核心架构，从生产级 State 设计模式到原子化的控制流。
 
-但在生产环境中，我们经常面临这样的挑战：
-1.  **非线性流程**：比如 "如果搜索结果为空，先问用户是否换关键词，而不是一直重试"。
-2.  **多角色协作**：需要一个 "Research Agent" 负责搜索，一个 "Writer Agent" 负责写作，它们之间需要通过状态切换。
-3.  **精确控制**：我们需要精确控制每一步 State 的变化，而不是依赖黑盒内部的 append。
+| 章节 | 核心内容 | 学习目标 |
+|:---|:---|:---|
+| **第1章** | 架构哲学 | BSP 模型、Pregel 运行时机制 |
+| **第2章** | 状态工程 | `MessagesState` 标准范式、Input/Output Schema 分离 |
+| **第3章** | 路由控制 | **Command API** 原子化路由 |
+| **第4章** | 持久化与记忆 | Checkpoint 快照机制、Time Travel 状态回滚 |
+| **第5章** | 生产级模式 | Streaming 流式输出、运行时配置 Config |
 
-**LangGraph** 应运而生。它不是简单的 DAG（有向无环图），而是一个**带状态的、可循环的、事件驱动的 Actor 模型系统**。
+> 💡 **前置知识**: 需掌握第二篇的 Agent 基础。本篇代码基于 LangChain 1.0+ 和 LangGraph 最新标准。
 
 ---
 
 ## 第1章：LangGraph 架构哲学 (Architecture)
 
-LangGraph 的设计灵感来源于 Google 的 **Pregel** 图计算模型。理解这一点，是精通 LangGraph 的关键。
+### 1.1 从无状态 DAG 到有状态 Actor
 
-### 1.1 核心运行机制：BSP 模型
+在 LangChain 时代，我们构建的是 **DAG (有向无环图)**，数据像流水一样经过 `Prompt -> Model -> Parser`。
 
-LangGraph 的运行并非简单的 "A调B"，而是遵循 **Bulk Synchronous Parallel (BSP)** 模式。
+但在构建复杂的 Agent 时，我们需要处理：
+1.  **循环 (Loops)**：思考 -> 行动 -> 观察 -> 再思考...
+2.  **持久状态 (Persistence)**：多轮对话的记忆管理。
+3.  **分支决策 (Branching)**：根据工具执行结果决定下一步。
+
+LangGraph 引入了 **Actor Model** 和 **State Machine (状态机)** 的概念，让 LLM 应用具备了“图”的能力。
+
+### 1.2 核心运行机制：BSP 模型
+
+LangGraph 的底层设计灵感源自 Google Pregel 图计算模型，采用 **BSP (Bulk Synchronous Parallel)** 机制。这是理解并发与状态一致性的基石。
 
 ```mermaid
 sequenceDiagram
-    participant State
-    participant Node A
-    participant Node B
+    participant State as 共享状态
+    participant Node_A as Node A
+    participant Node_B as Node B
 
     Note over State: Super-step 1 (Start)
-    State->>Node A: 触发 (Input)
-    Node A->>State: 返回 Update ({"cnt": 1})
+    State->>Node_A: 1. 读取 State
+    Node_A->>Node_A: 2. 执行逻辑
+    Node_A->>State: 3. 返回 Update
 
-    Note over State: State Apply Update (Reducer)
+    Note over State: Barrier Synchronization (同步屏障)
+    State->>State: 4. 应用 Reducers (Merge)
+    State->>Checkpointer: 5. 保存快照 (Snapshot)
 
     Note over State: Super-step 2
-    State->>Node B: 触发 (基于由A更新后的State)
-    Node B->>State: 返回 Update ({"cnt": 2})
+    State->>Node_B: 6. 读取新状态...
 ```
 
-**关键概念**：
-- **Super-step (超步)**：图执行的一个原子周期。所有并行的 Node 执行完，才算一步结束。
-- **State (状态)**：图的共享内存。Node **不直接** 通信，而是通过更新 State 来通信。
-- **Reducer**：决定 Node 返回的 `dict` 是 "覆盖" State 还是 "追加" 到 State。
-
-### 1.2 三大支柱 (The Three Pillars)
-
-构建任何 Graph，本质上就是定义这三个东西：
-
-| 组件 | 这代表什么？ | 代码体现 |
-| :--- | :--- | :--- |
-| **State (状态)** | **内存**。当前 Agent 到底知道什么？ | `TypedDict` / `Pydantic` |
-| **Nodes (节点)** | **行动**。LLM 思考、工具调用、逻辑判断。 | `def func(state) -> dict:` |
-| **Edges (边)** | **路由**。下一步去哪？ | `workflow.add_edge()` |
+**关键特性**：
+*   **并行隔离**：在同一个 Step 中，Node A 看不到 Node B 的更新。
+*   **统一归约**：所有更新在 Step 结束时统一合并 (Reduce)。
+*   **三阶段执行**：Plan (规划) -> Execute (执行) -> Update (更新)。
 
 ---
 
-## 第2章：State 深度解析 (State Engineering)
+## 第2章：状态工程 (State Engineering)
 
-State 是 LangGraph 的灵魂。很多初学者混淆 "State" 和 "Context"。在 LangGraph 中，State 是**强类型**的。
+在 LangGraph 中，State 不仅仅是数据的集合，更是通信的协议。官方文档推荐使用标准化的模式来定义状态。
 
-### 2.1 定义 State Schema
+### 2.1 核心标准：MessagesState
 
-最推荐的方式是使用 Python 原生的 `TypedDict`。
-
-```python
-from typing import TypedDict, Annotated, List
-from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage
-
-# 定义我们的图状态
-class AgentState(TypedDict):
-    # 核心字段：对话历史
-    # Annotated[List, add_messages] 是标准范式
-    messages: Annotated[List[BaseMessage], add_messages]
-
-    # 自定义字段：当前步骤的总结
-    step_summary: str
-
-    # 自定义字段：结构化输出结果
-    final_result: dict
-```
-
-### 2.2 深入 Reducer：add_messages 的魔法
-
-很多同学只知道 `add_messages` 能追加消息，但它其实隐含了复杂的 **Upsert (更新插入)** 逻辑。
-
-**为什么它很重要？**
-在 **Human-in-the-loop**（人工修正）场景中，如果我们想修改 Agent 发出的上一条错误消息，我们不需要删除它，只需要**发送一条 ID 相同的新消息**。
+LangGraph 提供了开箱即用的 **`MessagesState`**，它内置了 `messages` 字段和 `add_messages` reducer。这是构建 Chat Agent 的标准起点。
 
 ```python
-# 假设当前 State
-# messages = [HumanMessage(id='1', content='Hi'), AIMessage(id='2', content='Bye')]
+from langgraph.graph import MessagesState
 
-# 1. 普通追加 (Append)
-# 节点返回: {"messages": [AIMessage(id='3', content='New')]}
-# 结果: [msg('1'), msg('2'), msg('3')]
-
-# 2. 更新修正 (Upsert/Update) -> Time Travel 的基础
-# 节点返回: {"messages": [AIMessage(id='2', content='Good bye')]}
-# 结果: [msg('1'), msg('2', content='Good bye')]  <-- 只有内容变了，ID没变
+# ✅ 最佳实践：继承 MessagesState 来定义你的 Agent State
+class AgentState(MessagesState):
+    # messages 字段已自动包含，能够正确处理追加和更新
+    # 仅需定义额外的业务字段
+    documents: list[str]
+    steps_taken: int
 ```
 
-> 💡 **Best Practice**: 始终为你的 Message 分配 `id`，或者利用 LangGraph 自动生成的 ID，以便后续精确控制。
+**为什么直接用 `MessagesState`？**
+1.  **内置 Reducer**：自动处理消息的追加 (Append) 和更新 (Update)。
+2.  **减少样板**：避免了手动编写 `Annotated[list, add_messages]` 的繁琐和易错。
+3.  **兼容性**：与 LangGraph 的预置组件 (如 `ToolNode`) 完美兼容。
+
+### 2.2 生产级模式：Input/Output Schema 分离
+
+对于对外提供 API 的服务，官方强烈建议显式区分 **Input** (输入)、**Output** (输出) 和 **Overall** (内部) 状态。
+
+```python
+from typing import TypedDict
+
+# 1. 定义输入契约 (用户请求)
+class InputState(TypedDict):
+    question: str
+    user_id: str
+
+# 2. 定义输出契约 (API 响应)
+class OutputState(TypedDict):
+    answer: str
+    confidence: float
+
+# 3. 定义内部状态 (全量上下文)
+# 继承 Input 和 Output，并添加私有字段
+class OverallState(InputState, OutputState):
+    scratchpad: list[str]   # 私有字段：思考过程
+
+# 4. 构建图时指定 Schema
+# graph = StateGraph(OverallState, input=InputState, output=OutputState)
+```
+
+> 💡 **Best Practice**: 这种模式非常适合 REST API 封装，能够清晰地隔离"用户传的"、"系统算的"和"最终返回的"。
+
+### 2.3 深入 add_messages 的 Upsert 机制
+
+`MessagesState` 背后的核心是 `add_messages` reducer。它的行为不仅仅是 append：
+
+1.  **Append (追加)**: 如果新消息 ID 不存在，追加到列表。
+2.  **Update (更新)**: 如果新消息 ID 已存在，**替换**旧消息内容。
+
+这是实现 **Human Correction (人工修正)** 的关键：我们无需删除错误消息，只需注入一条 ID 相同的新消息即可覆盖。
 
 ---
 
-## 第3章：构建可控 Agent (Building Control)
+## 第3章：构建可控 Agent (Command API)
 
-为了摆脱预构建 Agent 的黑盒限制，我们从零构建一个 ReAct 循环。
+LangGraph 引入了原子化的 **Command API**，这是目前控制流的最佳实践。别再写分散的 `conditional_edges` 了。
 
-### 3.1 基础循环 (The Loop)
+### 3.1 实战：使用 Command 实现原子路由
 
-ReAct 的本质就是：Call Model -> Call Tools -> Call Model...
+我们将构建一个具备天气查询能力的 ReAct Agent。
+
+**步骤 1：定义工具与模型**
 
 ```python
-from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 
-# 定义模拟工具
 @tool
-def search_tool(query: str):
-    """Search for information"""
-    return "LangGraph is powerful"
+def get_weather(city: str):
+    """查询指定城市的天气"""
+    return f"{city} 天气晴朗，25℃"
 
-llm = ChatOpenAI(model="gpt-4o")
-tools = [search_tool]
-
-# 1. 定义节点：思考 (Think)
-def agent_node(state: AgentState):
-    messages = state["messages"]
-    model_with_tools = llm.bind_tools(tools)
-    response = model_with_tools.invoke(messages)
-    # 返回的内容会被 add_messages 追加到 State
-    return {"messages": [response]}
-
-# 2. 定义节点：行动 (Act)
-tool_node = ToolNode(tools)
-
-# 3. 组装
-workflow = StateGraph(AgentState)
-workflow.add_node("agent", agent_node)
-workflow.add_node("tools", tool_node)
-
-workflow.add_edge(START, "agent")
-
-# 4. 关键：条件路由
-# 如果 LLM 决定调用工具 -> 去 "tools"
-# 如果 LLM 决定仅回复 -> 去 END
-workflow.add_conditional_edges(
-    "agent",
-    tools_condition,
-    {"tools": "tools", END: END}
-)
-
-workflow.add_edge("tools", "agent") # 动作完成后，把结果返回给大脑，继续思考
+tools = [get_weather]
+model = ChatOpenAI(model="gpt-4o").bind_tools(tools)
 ```
 
-### 3.2 动态控制流 (Command API) 🚀
-
-**场景**：假设我们在做一个客服机器人。如果用户说 "再见"，我们需要立刻结束对话，且不经过任何其他判断。或者如果是 "转人工"，我们需要跳转到另一个子图。
-
-传统的 `Conditional Edge` 只能根据当前 State 决定去哪。而 `Command` 允许节点**不仅决定去哪，还能同时更新 State**。
+**步骤 2：定义 Agent 节点 (使用 Command)**
 
 ```python
 from langgraph.types import Command
+from langgraph.graph import END
 from typing import Literal
-from langchain_core.messages import SystemMessage
 
-def supervisor_node(state: AgentState) -> Command[Literal["research_agent", "support_agent", END]]:
-    """路由节点：决定下一个说话的是谁"""
-    user_input = state["messages"][-1].content
+# 定义 Agent 节点
+def agent_node(state: AgentState) -> Command[Literal["tools", END]]:
+    messages = state["messages"]
+    response = model.invoke(messages)
 
-    if "投诉" in user_input:
+    # 构造状态更新 (Command 的 update 参数)
+    update = {"messages": [response]}
+
+    # 核心路由逻辑：原子化决定去向
+    if response.tool_calls:
+        # 原子操作：更新状态 + 跳转 tools
         return Command(
-            # 跳转到客服，并附带一条指令（State Update）
-            update={"messages": [SystemMessage("注意：用户情绪激动")]},
-            # 同时跳转（Control Flow）
-            goto="support_agent"
+            update=update,
+            goto="tools"
         )
-    elif "查询" in user_input:
-        return Command(goto="research_agent")
 
-    return Command(goto=END)
+    # 否则 -> 更新状态并结束
+    return Command(update=update, goto=END)
 ```
 
-**为什么 Command 更好？**
-- **原子性**：Update + Goto 是原子的。
-- **清晰性**：逻辑写在 Python 函数里，而不是分散在 Graph 定义的 Edge 里。
+**步骤 3：组装 Graph**
+
+```python
+from langgraph.graph import StateGraph, START
+from langgraph.prebuilt import ToolNode
+
+# 使用我们自定义的 AgentState
+workflow = StateGraph(AgentState)
+
+# 添加节点
+workflow.add_node("agent", agent_node)
+workflow.add_node("tools", ToolNode(tools)) # 使用官方预置的 ToolNode
+
+# 定义边
+workflow.add_edge(START, "agent")
+workflow.add_edge("tools", "agent") # 工具执行完，必须回到 Agent 继续思考
+
+# 编译应用
+app = workflow.compile()
+```
+
+### 3.2 为什么 Command API 是未来？
+
+| 特性 | 旧版 Conditional Edge | 新版 Command API |
+|:---|:---|:---|
+| **代码位置** | 分散在 `add_conditional_edges` | 内聚在 Node 函数内部 |
+| **状态更新** | 无法在路由时更新 State | `update` 参数支持原子更新 |
+| **可读性** | 逻辑割裂，难以调试 | 类似 `return goto`，符合编程直觉 |
 
 ---
 
-## 第4章：企业级特性 (Enterprise Features)
+## 第4章：持久化与 Time Travel
 
-在 Demo 和 Production 之间，隔着 persistence 和 HITL。
+### 4.1 Checkpoint 机制
 
-### 4.1 持久化 (Persistence)
-
-LangGraph 的持久化不仅是 "保存聊天记录"，它是保存图的**完整快照 (Snapshot)**。
+LangGraph 的持久化是对 **Graph State** 的完整 **Snapshot (快照)**。
 
 ```python
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.memory import MemorySaver
 
-# 必须在编译时传入 checkpointer
-app = workflow.compile(checkpointer=InMemorySaver())
+# 1. 注入 Checkpointer (生产环境推荐 PostgresSaver)
+checkpointer = MemorySaver()
+app = workflow.compile(checkpointer=checkpointer)
 
-# 必须在调用时提供 thread_id
-config = {"configurable": {"thread_id": "user_123"}}
-app.invoke(..., config=config)
+# 2. 运行时指定 Thread ID
+config = {"configurable": {"thread_id": "session_1"}}
+
+# 第一轮
+app.invoke({"messages": [("user", "Hello")]}, config=config)
 ```
 
-**底层原理**：
-每当一个 Super-step 结束（所有并行节点执行完），LangGraph 就会把当前的 `State` 序列化并存入 Checkpointer。这使得我们可以随时 "加载" 任意历史时刻的状态。
+### 4.2 Time Travel (状态回滚)
 
-### 4.2 人机回环 (HITL) 与 Time Travel
-
-**场景**：Agent 准备执行 `delete_database()` 操作，我们需要人工审批。
+利用快照，我们可以“穿越”回任意历史状态并分叉执行。
 
 ```python
-# 1. 编译时设置中断
-app = workflow.compile(
-    checkpointer=checkpointer,
-    interrupt_before=["dangerous_tool_node"]
-)
+# 1. 获取历史快照
+history = list(app.get_state_history(config))
+last_snapshot = history[1] # 获取倒数第二步
 
-# 2. 运行 -> 暂停在 dangerous_tool_node 之前
-app.invoke(...)
+# 2. Fork 执行 (从过去的状态分叉)
+fork_config = config.copy()
+fork_config["configurable"]["checkpoint_id"] = last_snapshot.config["configurable"]["checkpoint_id"]
 
-# 3. 后台审批：获取当前状态
-snapshot = app.get_state(config)
-next_step = snapshot.next # ('dangerous_tool_node',)
-
-# 4. 人工决定：
-# 选项 A: 批准 -> 继续执行
-# app.invoke(None, config=config)
-
-# 选项 B: 拒绝 -> 修改状态 (Time Travel)
-# 我们直接把那个 ToolCall 消息改成 "用户拒绝了操作"
-from langchain_core.messages import AIMessage
-
-app.update_state(
-    config,
-    {"messages": [AIMessage(content="操作被拒绝")]},
-    # 这里的 as_node 用来伪装成是上一个节点发出的
-    as_node="agent"
-)
-# 然后继续执行，Agent 会看到"操作被拒绝"的消息，而不是去执行工具
-app.invoke(None, config=config)
-```
-
-这就是 **Time Travel** 的威力：我们不仅能看历史，还能**改写历史**，从而引导 Agent 走向正确的未来。
-
----
-
-## 第5章：生产级模式 (Production Patterns)
-
-### 5.1 子图 (Subgraphs) - 像乐高一样组合
-
-在复杂的企业应用中，单个 Graph 会变得庞大且难以维护。最佳实践是将其拆分为多个 **子图 (Subgraphs)**。
-
-例如：一个 **主控 Agent** 负责分发任务，一个 **编码 Agent** 负责写代码，一个 **搜索 Agent** 负责查资料。
-
-```python
-# 1. 定义子图 (Coding Agent)
-# code_graph = StateGraph(CodeState) ...
-code_app = code_graph.compile()
-
-# 2. 定义主图 (Main Agent)
-main_graph = StateGraph(MainState)
-
-# 3. 将编译好的子图作为一个普通节点加入！
-# 注意：入参和出参需要通过 wrapper 转换，或者确保 State 兼容
-main_graph.add_node("coding_expert", code_app)
-
-# 4. 路由
-main_graph.add_conditional_edges("supervisor", router_logic, {"code": "coding_expert", ...})
-```
-
-**为什么这么做？**
-- **解耦**：Coding Agent 可以由团队 A 维护，Main Agent 由团队 B 维护。
-- **复用**：同一个 Search Agent 可以被多个不同的主图调用。
-
-### 5.2 动态并行 (Map-Reduce with Send)
-
-LangGraph 不仅支持静态的并行（A->B, A->C），还支持动态的并行（Map-Reduce）。
-例如：你有 10 个 PDF 文档需要总结，但这 10 个数量是动态的。
-
-使用 `Send` API，我们可以在运行时分发任务：
-
-```python
-from langgraph.types import Send
-
-# 1. Map 步骤：生成任务列表
-def map_node(state: State):
-    subjects = state["subjects"] # ["AI", "Python", "Rust"]
-    # 为每个 subject 生成一个 Send 对象
-    # Send(节点名, 节点需要的State)
-    return [Send("generate_joke", {"subject": s}) for s in subjects]
-
-# 2. Worker 节点：处理单个任务
-def generate_joke(state: WorkerState):
-    return {"jokes": [f"Joke about {state['subject']}"]}
-
-# 3. 注册 Conditional Edge
-# map_node -> 动态分发给 generate_joke
-workflow.add_conditional_edges("map_node", map_node)
-```
-
-这让 LangGraph 能够处理大规模的数据处理流水线。
-
-### 5.3 运行时配置 (Configuration)
-
-硬编码模型参数是生产环境的大忌。LangGraph 允许通过 `configurable` 字典在运行时透传参数。
-
-**定义节点时接收 config**：
-
-```python
-from langchain_core.runnables import ConfigurableField, RunnableConfig
-
-def model_node(state: AgentState, config: RunnableConfig):
-    # 1. 获取运行时参数
-    user_id = config.get("configurable", {}).get("user_id")
-    model_name = config.get("configurable", {}).get("model", "gpt-4")
-
-    # 2. 根据参数动态调整行为
-    # llm = ChatOpenAI(model=model_name)
-    # ...
-```
-
-**调用时传递**：
-
-```python
 app.invoke(
-    inputs,
-    config={"configurable": {"user_id": "1001", "model": "claude-3-5-sonnet"}}
+    {"messages": [("user", "Wait, actually I mean...")]},
+    config=fork_config
 )
 ```
 
 ---
+
+## 第5章：生产级高级模式 (Advanced Patterns)
+
+### 5.1 Streaming 流式输出
+
+前端交互必备。
+
+```python
+# 模式: stream_mode="updates" (推荐)
+# 只推送状态的增量变化 (Delta)
+async for chunk in app.astream(inputs, stream_mode="updates"):
+    for node, update in chunk.items():
+        print(f"Node {node} updated: {update}")
+```
+
+### 5.2 运行时配置 (Configuration)
+
+避免硬编码，实现多租户隔离。
+
+```python
+from langchain_core.runnables import RunnableConfig
+
+def agent_node(state: AgentState, config: RunnableConfig):
+    # 从 config 中读取动态参数
+    user_id = config.get("configurable", {}).get("user_id")
+    model_name = config.get("configurable", {}).get("model", "gpt-4o")
+
+    # 动态构建模型
+    model = ChatOpenAI(model=model_name)
+    ...
+
+# 调用时传参
+app.invoke(inputs, config={"configurable": {"model": "claude-3-5-sonnet"}})
+```
 
 ## 第6章：健壮性与调试 (Robustness & Debugging)
 
@@ -366,6 +304,7 @@ workflow.add_node("agent", call_model, retry_policy=policy)
 ```
 
 **为什么这比内部 try-catch 好？**
+
 - **解耦**：业务逻辑保持纯净。
 - **透明**：Graph Engine 知道重试发生，可以在监控中记录。
 
@@ -389,6 +328,17 @@ with open("graph.png", "wb") as f:
 ### 6.3 异常处理与事务 (Transactional)
 
 LangGraph 的每一步（Super-step）都是事务性的。
+
 - 如果并行执行的三个 Node 中有一个抛出未捕获异常。
 - **整个 Super-step 回滚**（即另外两个成功的 Node 的 State 更新也不会应用）。
 - 这保证了 State 的一致性，不会出现“一半成功一半失败”的脏数据。
+
+## 本篇小结
+
+通过本篇的学习，你应该已经掌握了 LangGraph 的**标准开发范式**：
+
+1.  **State**: 始终继承 **`MessagesState`**，利用内置的 `add_messages` 处理对话历史。
+2.  **Control**: 拥抱 **`Command` API**，在 Node 内部原子化地处理状态更新与路由。
+3.  **Ops**: 熟练使用 Checkpoint 进行状态管理和回滚，利用 Streaming 优化用户体验。
+
+掌握了这些，你已经构建了坚实的各类 Agent 应用基石。

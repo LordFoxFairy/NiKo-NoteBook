@@ -14,39 +14,6 @@
 
 ---
 
-## 学习路径
-
-```mermaid
-graph LR
-    A[基础RAG<br/>第四篇] --> B[混合检索<br/>第1章]
-    B --> C[重排序<br/>第2章]
-    C --> D[知识图谱RAG<br/>第3章]
-    D --> E[前沿方案<br/>第4章]
-
-    style A fill:#e1f5e1
-    style B fill:#fff4e1
-    style C fill:#fff4e1
-    style D fill:#ffe1e1
-    style E fill:#ffe1e1
-```
-
-**本篇覆盖内容**:
-- **第1章**:混合检索(Hybrid Search) - 向量检索 + 全文检索
-- **第2章**:重排序技术(Reranking) - 提升检索精度
-- **第3章**:知识图谱RAG(GraphRAG) - 结构化知识表示
-- **第4章**:前沿RAG方案(Self-RAG, Corrective RAG, Agentic RAG)
-
----
-
-## 适用人群
-
-- 已学习第四篇《RAG基础篇(LangChain篇)》,了解RAG基础的开发者
-- 需要优化RAG系统性能的工程师
-- 想要了解前沿RAG技术的研究者
-- 准备构建生产级RAG应用的架构师
-
----
-
 ## 核心概念对比
 
 | 技术 | 解决的问题 | 性能提升 | 复杂度 | 适用场景 |
@@ -60,11 +27,11 @@ graph LR
 
 ---
 
-# 第1章:混合检索技术(Hybrid Search)
+## 第1章:混合检索技术(Hybrid Search)
 
-## 1.1 为什么需要混合检索
+### 1.1 为什么需要混合检索
 
-### 1.1.1 向量检索的局限性
+#### 1.1.1 向量检索的局限性
 
 **问题示例**:
 ```python
@@ -76,18 +43,19 @@ graph LR
 ```
 
 **向量检索的问题**:
+
 1. **关键词敏感信息丢失**:版本号、产品型号等精确匹配需求
 2. **罕见词处理不佳**:专业术语、公司名称等低频词
 3. **语义泛化过度**:可能返回相关但不精确的结果
 
-### 1.1.2 全文检索的局限性
+#### 1.1.2 全文检索的局限性
 
 **BM25算法的问题**:
 1. **无法理解语义**:"汽车保养"和"车辆维护"无法匹配
 2. **同义词问题**:"北京"和"首都"无法关联
 3. **词序不敏感**:"狗咬人"和"人咬狗"评分相似
 
-### 1.1.3 混合检索的优势
+#### 1.1.3 混合检索的优势
 
 ```
 混合检索 = 向量检索(语义理解) + 全文检索(精确匹配)
@@ -100,13 +68,13 @@ graph LR
 
 ---
 
-## 1.2 LangChain混合检索实现
+### 1.2 LangChain混合检索实现
 
-### 1.2.1 基础混合检索
+#### 1.2.1 基础混合检索
 
 ```python
 from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers.ensemble import EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -162,7 +130,7 @@ for doc in results:
 
 ---
 
-### 1.2.2 权重调优
+#### 1.2.2 权重调优
 
 **不同权重的效果**:
 
@@ -197,7 +165,7 @@ for weights, desc in test_weights:
 
 ---
 
-### 1.2.3 完整RAG系统(混合检索)
+#### 1.2.3 完整RAG系统(混合检索)
 
 ```python
 from langchain.agents import create_agent
@@ -249,7 +217,7 @@ print(result["messages"][-1].content)
 
 ---
 
-### 1.2.4 RRF(Reciprocal Rank Fusion)算法
+#### 1.2.4 RRF(Reciprocal Rank Fusion)算法
 
 **RRF原理**:
 ```
@@ -318,9 +286,9 @@ for i, doc in enumerate(fused_results[:3], 1):
 
 ---
 
-## 1.3 混合检索实战:电商产品搜索
+### 1.3 混合检索实战:电商产品搜索
 
-### 1.3.1 场景说明
+#### 1.3.1 场景说明
 
 **业务需求**:
 - 用户查询:"iPhone 14 Pro 256GB 紫色"
@@ -336,7 +304,7 @@ for i, doc in enumerate(fused_results[:3], 1):
 
 ---
 
-### 1.3.2 完整实现
+#### 1.3.2 完整实现
 
 ```python
 from langchain_community.document_loaders import JSONLoader
@@ -344,7 +312,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers.ensemble import EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever
 from langchain.agents import create_agent
 from langchain_core.tools import tool
 import json
@@ -478,9 +446,9 @@ for query in test_queries:
 
 ---
 
-## 1.4 混合检索最佳实践
+### 1.4 混合检索最佳实践
 
-### 1.4.1 权重调优策略
+#### 1.4.1 权重调优策略
 
 **A/B测试不同权重**:
 
@@ -550,7 +518,7 @@ for vec_weight, bm25_weight in weights_to_test:
 
 ---
 
-### 1.4.2 何时使用混合检索
+#### 1.4.2 何时使用混合检索
 
 **决策树**:
 
@@ -577,7 +545,7 @@ for vec_weight, bm25_weight in weights_to_test:
 
 ---
 
-## 小结
+### 小结
 
 **混合检索核心要点**:
 
@@ -605,11 +573,11 @@ for vec_weight, bm25_weight in weights_to_test:
 
 ---
 
-# 第2章:重排序技术(Reranking)
+## 第2章:重排序技术(Reranking)
 
-## 2.1 为什么需要重排序
+### 2.1 为什么需要重排序
 
-### 2.1.1 检索器的局限性
+#### 2.1.1 检索器的局限性
 
 **问题场景**:
 ```python
@@ -634,7 +602,7 @@ for vec_weight, bm25_weight in weights_to_test:
 
 ---
 
-### 2.1.2 重排序的作用
+#### 2.1.2 重排序的作用
 
 **重排序流程**:
 ```
@@ -652,7 +620,7 @@ LLM生成
 
 ---
 
-### 2.1.3 重排序 vs 检索器
+#### 2.1.3 重排序 vs 检索器
 
 | 维度 | 检索器(Retriever) | 重排序器(Reranker) |
 |------|-------------------|-------------------|
@@ -664,12 +632,12 @@ LLM生成
 
 ---
 
-## 2.2 LangChain重排序实现
+### 2.2 LangChain重排序实现
 
-### 2.2.1 基于ContextualCompressionRetriever
+#### 2.2.1 基于ContextualCompressionRetriever
 
 ```python
-from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever
+from langchain.retrievers import ContextualCompressionRetriever
 from langchain_community.retrievers.document_compressors import LLMChainExtractor
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
@@ -724,7 +692,7 @@ for i, doc in enumerate(compressed_docs, 1):
 
 ---
 
-### 2.2.2 使用EmbeddingsFilter(基于embedding距离)
+#### 2.2.2 使用EmbeddingsFilter(基于embedding距离)
 
 ```python
 from langchain_community.retrievers.document_compressors import EmbeddingsFilter
@@ -759,7 +727,7 @@ print(f"过滤后:{len(filtered_docs)}个文档(相似度≥0.75)")
 
 ---
 
-### 2.2.3 本地重排序模型(Cross-Encoder)
+#### 2.2.3 本地重排序模型(Cross-Encoder)
 
 ```python
 from sentence_transformers import CrossEncoder
@@ -841,7 +809,7 @@ for i, doc in enumerate(reranked_results, 1):
 
 ---
 
-### 2.2.4 集成到完整RAG系统
+#### 2.2.4 集成到完整RAG系统
 
 ```python
 from langchain.agents import create_agent
@@ -939,9 +907,9 @@ print(result["messages"][-1].content)
 
 ---
 
-## 2.3 查询改写(Query Rewriting)
+### 2.3 查询改写(Query Rewriting)
 
-### 2.3.1 多查询生成(Multi-Query)
+#### 2.3.1 多查询生成(Multi-Query)
 
 **问题**:用户查询可能表达不清晰
 ```python
@@ -959,7 +927,7 @@ print(result["messages"][-1].content)
 **实现**:
 
 ```python
-from langchain_classic.retrievers.multi_query import MultiQueryRetriever
+from langchain.retrievers import MultiQueryRetriever
 from langchain_openai import ChatOpenAI
 
 # 创建Multi-Query检索器
@@ -997,7 +965,7 @@ LLM生成改写查询:
 
 ---
 
-## 小结
+### 小结
 
 **重排序技术核心要点**:
 
@@ -1019,11 +987,11 @@ LLM生成改写查询:
 
 ---
 
-# 第3章:知识图谱RAG(GraphRAG)
+## 第3章:知识图谱RAG(GraphRAG)
 
-## 3.1 为什么需要知识图谱RAG
+### 3.1 为什么需要知识图谱RAG
 
-### 3.1.1 向量RAG的局限性
+#### 3.1.1 向量RAG的局限性
 
 **问题场景**:
 ```
@@ -1052,9 +1020,9 @@ LLM生成改写查询:
 
 ---
 
-## 3.2 Neo4j + LangChain实现
+### 3.2 Neo4j + LangChain实现
 
-### 3.2.1 环境准备
+#### 3.2.1 环境准备
 
 ```bash
 # 安装Neo4j(使用Docker)
@@ -1068,7 +1036,7 @@ docker run \
 pip install langchain-community langchain-neo4j neo4j
 ```
 
-### 3.2.2 基础知识图谱RAG
+#### 3.2.2 基础知识图谱RAG
 
 ```python
 from langchain_community.graphs import Neo4jGraph
@@ -1142,79 +1110,64 @@ RETURN manager.name
 
 ---
 
-### 3.2.3 混合RAG:向量 + 知识图谱
+#### 3.2.3 GraphRAG: 向量 + 图遍历 (Neo4jVector)
+
+真正的 GraphRAG 不仅仅是让 Agent 多一个查图的工具，而是利用"向量搜索"作为图入口，结合图遍历获取上下文。
+
+**工作流程**:
+1. **Indexing**: 提取文档中的实体(Nodes)和关系(Relationships)存入Neo4j，并对实体文本或文档块进行Embedding。
+2. **Retrieval**:
+   - Step 1: Query -> Vector Search -> 找到最相似的实体节点(Entry Points)。
+   - Step 2: Graph Traversal -> 从入口节点出发，遍历获取邻居节点(Context)。
+3. **Generation**: 将结构化上下文(邻居关系)提交给LLM回答。
 
 ```python
+from langchain_community.vectorstores import Neo4jVector
 from langchain_openai import OpenAIEmbeddings
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.agents import create_agent
-from langchain_core.tools import tool
 
-# 步骤1: 构建向量检索器(处理非结构化文档)
-loader = TextLoader("./employee_docs.txt")
-documents = loader.load()
+# 使用Neo4jVector实现"向量入口 + 图遍历"的检索
+# 假设Graph中已经存在 Employee 节点, 且包含 "name", "position" 等属性
 
-splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-splits = splitter.split_documents(documents)
+# 步骤1: 创建向量检索器 (连接现有的图)
+vector_store = Neo4jVector.from_existing_graph(
+    embedding=OpenAIEmbeddings(),
+    url="bolt://localhost:7687",
+    username="neo4j",
+    password="password",
+    index_name="employee_index",
+    node_label="Employee",
+    text_node_properties=["name", "position", "department"], # 这些属性内容会被向量化
+    embedding_node_property="embedding", # 向量存放在节点的embedding属性中
 
-vectorstore = Chroma.from_documents(splits, OpenAIEmbeddings())
-vector_retriever = vectorstore.as_retriever()
-
-# 步骤2: 创建工具
-
-@tool
-def search_documents(query: str) -> str:
-    """搜索员工文档(非结构化信息)"""
-    results = vector_retriever.invoke(query)
-    return "\n\n".join([doc.page_content for doc in results[:3]])
-
-@tool
-def query_knowledge_graph(query: str) -> str:
-    """查询知识图谱(结构化关系)
-
-    适用于:
-    - 组织架构查询(谁的领导、团队成员)
-    - 项目关系(谁参与了什么项目)
-    - 多跳关系推理
+    # 【核心Magic】retrieval_query: 向量检索找到节点后, 执行此Cypher获取上下文
+    # 这里的 'node' 是向量匹配到的节点
+    retrieval_query="""
+    // 找到该员工的直接下属 (1跳关系)
+    MATCH (node)<-[:REPORTS_TO]-(subordinate)
+    RETURN "员工: " + node.name + " (" + node.position + ")" +
+           " 管理着: " + subordinate.name + " (" + subordinate.position + ")" AS text,
+           score,
+           {} AS metadata
     """
-    result = cypher_chain.invoke({"query": query})
-    return result['result']
-
-# 步骤3: 创建混合RAG Agent
-hybrid_agent = create_agent(
-    model="gpt-4",
-    tools=[search_documents, query_knowledge_graph],
-    system_prompt="""你是一个员工信息查询助手,可以查询员工的技能和组织关系。
-
-可用工具:
-- search_documents: 查询员工的技能、背景等非结构化信息
-- query_knowledge_graph: 查询组织架构、项目关系等结构化信息
-
-根据查询类型选择合适的工具,或组合使用多个工具。"""
 )
 
-# 步骤4: 测试混合查询
-test_queries = [
-    "张三的技能是什么?",  # 向量检索
-    "张三的领导是谁?",    # 知识图谱
-    "张三的领导有哪些技能?"  # 混合:图谱找领导,向量查技能
-]
+# 步骤2: 执行检索
+# 查询: "谁是李四的下属?"
+# 1. 向量检索找到 "李四" 节点
+# 2. 执行 retrieval_query 找到李四的下属
+results = vector_store.similarity_search("李四", k=1)
 
-for query in test_queries:
-    print(f"\n{'='*50}")
-    print(f"查询:{query}")
-    print('='*50)
-    result = hybrid_agent.invoke({
-        "messages": [{"role": "user", "content": query}]
-    })
-    print(result["messages"][-1].content)
+print(f"GraphRAG检索结果:")
+for doc in results:
+    print(doc.page_content)
+
+# 输出示例:
+# 员工: 李四 (技术经理) 管理着: 张三 (工程师)
 ```
 
 ---
 
-## 3.3 GraphRAG vs 传统RAG性能对比
+### 3.3 GraphRAG vs 传统RAG性能对比
 
 | 查询类型 | 传统RAG准确率 | GraphRAG准确率 | 提升 |
 |---------|-------------|---------------|------|
@@ -1231,11 +1184,11 @@ for query in test_queries:
 
 ---
 
-# 第4章:前沿RAG方案
+## 第4章:前沿RAG方案
 
-## 4.1 Self-RAG(自我反思检索)
+### 4.1 Self-RAG(自我反思检索)
 
-### 4.1.1 核心思想
+#### 4.1.1 核心思想
 
 ```
 传统RAG:
@@ -1254,7 +1207,7 @@ Self-RAG:
 
 ---
 
-### 4.1.2 简化实现
+#### 4.1.2 简化实现
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -1386,9 +1339,9 @@ print(f"验证通过:{result['verified']}")
 
 ---
 
-## 4.2 Corrective RAG (CRAG)
+### 4.2 Corrective RAG (CRAG)
 
-### 4.2.1 核心流程
+#### 4.2.1 核心流程
 
 ```mermaid
 graph TD
@@ -1404,7 +1357,7 @@ graph TD
 
 ---
 
-### 4.2.2 简化实现
+#### 4.2.2 简化实现
 
 ```python
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -1433,7 +1386,7 @@ class CorrectiveRAG:
         elif relevance_score < 0.4:
             # 低相关:网络搜索
             print("本地文档相关性低,启动网络搜索...")
-            web_results = self.web_search.run(query)
+            web_results = self.web_search.invoke(query)
             return self._generate_answer(query, web_results)
 
         else:
@@ -1502,7 +1455,7 @@ print(answer)
 
 ---
 
-## 4.3 Agentic RAG
+### 4.3 Agentic RAG
 
 **核心思想**:让Agent自主决定何时检索、检索什么、如何组合信息
 
@@ -1554,11 +1507,11 @@ print(result["messages"][-1].content)
 
 ---
 
-## 小结
+### 小结
 
 **第3-4章核心要点**:
 
-### 知识图谱RAG(第3章)
+#### 知识图谱RAG(第3章)
 
 | 特性 | 价值 |
 |------|------|
@@ -1573,7 +1526,7 @@ print(result["messages"][-1].content)
 
 ---
 
-### 前沿RAG方案(第4章)
+#### 前沿RAG方案(第4章)
 
 | 方案 | 核心特点 | 性能提升 | 成本 |
 |------|---------|---------|------|
@@ -1585,85 +1538,6 @@ print(result["messages"][-1].content)
 - **高准确率需求** → Self-RAG或Corrective RAG
 - **复杂信息整合** → Agentic RAG
 - **成本敏感** → 传统RAG + 重排序(第2章)
-
----
-
-## 全篇总结
-
-**第十篇涵盖技术**:
-
-| 章节 | 核心技术 | 性能提升 | 适用场景 |
-|------|---------|---------|---------|
-| 第1章 | 混合检索(向量+BM25) | +20-30% | 精确匹配需求 |
-| 第2章 | 重排序(Cross-Encoder) | +20-25% | 精度要求高 |
-| 第3章 | 知识图谱RAG | +30-60%(多跳) | 结构化关系 |
-| 第4章 | Self-RAG, CRAG, Agentic RAG | +15-30% | 最高精度要求 |
-
-**技术选型决策树**:
-
-```
-你的RAG需求
-├── 基础文档问答
-│   └── 向量检索 + Embedding过滤
-├── 精确匹配(型号、版本)
-│   └── 混合检索(向量+BM25)
-├── 高精度要求
-│   └── 混合检索 + Cross-Encoder重排序
-├── 复杂关系查询
-│   └── 知识图谱RAG(Neo4j)
-└── 最高精度+复杂推理
-    └── Agentic RAG / Self-RAG
-```
-
----
-
-## API修复清单
-
-**本篇已修复的导入错误**:
-
-| 原错误导入 | ✅ 正确导入 | 说明 |
-|-----------|------------|------|
-| `from langchain.chains import GraphCypherQAChain` | `from langchain_community.chains.graph_qa.cypher import GraphCypherQAChain` | 移至community包 |
-| `from langchain.retrievers import EnsembleRetriever` | `from langchain_classic.retrievers.ensemble import EnsembleRetriever` | 移至classic包 |
-| `from langchain.retrievers import MultiQueryRetriever` | `from langchain_classic.retrievers.multi_query import MultiQueryRetriever` | 移至classic包 |
-| `from langchain.retrievers import ContextualCompressionRetriever` | `from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever` | 移至classic包 |
-
-**包版本要求**:
-- langchain: 1.0.8+
-- langchain-community: 0.4.1+
-- langchain-classic: 1.0.0+
-- langchain-neo4j: 最新版(用于Neo4j集成)
-
----
-
-## 参考资源
-
-1. **论文**:
-   - [Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection](https://arxiv.org/abs/2310.11511)
-   - [Corrective Retrieval Augmented Generation](https://arxiv.org/abs/2401.15884)
-   - [GraphRAG: Understanding and Reasoning on Knowledge Graphs](https://arxiv.org/abs/2404.16130)
-
-2. **工具**:
-   - Neo4j: https://neo4j.com/
-   - BGE Reranker: https://huggingface.co/BAAI/bge-reranker-v2-m3
-   - LangChain文档: https://python.langchain.com/
-
-3. **LangChain API参考**:
-   - LangChain Community: https://python.langchain.com/api_reference/community/
-   - LangChain Classic: https://python.langchain.com/api_reference/langchain/
-   - Neo4j Integration: https://python.langchain.com/docs/integrations/providers/neo4j/
-
----
-
-**第十篇完成**!
-
-你已经掌握了LangChain RAG的高级技术:
-- ✅ 混合检索:语义+关键词
-- ✅ 重排序:Cross-Encoder精排
-- ✅ 知识图谱:结构化推理
-- ✅ 前沿方案:Self-RAG, CRAG, Agentic RAG
-
-**更新日期**: 2025-11-23
 
 ---
 
@@ -1681,9 +1555,9 @@ print(result["messages"][-1].content)
 
 ---
 
-### 5.1 生产系统架构设计
+#### 5.1 生产系统架构设计
 
-#### 5.1.1 完整架构
+##### 5.1.1 完整架构
 
 ```
 用户查询
@@ -1729,7 +1603,7 @@ print(result["messages"][-1].content)
 └───────────────────────────────────┘
 ```
 
-#### 5.1.2 生产级实现
+##### 5.1.2 生产级实现
 
 ```python
 # production_hybrid_retriever.py
@@ -1738,7 +1612,7 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers.ensemble import EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever
 from functools import lru_cache
 import asyncio
 import time
@@ -1973,9 +1847,9 @@ print(f"  缓存命中率: {stats['cache_hit_rate']:.1%}")
 
 ---
 
-### 5.2 评估与优化体系
+#### 5.2 评估与优化体系
 
-#### 5.2.1 构建评估数据集
+##### 5.2.1 构建评估数据集
 
 ```python
 # build_eval_dataset.py
@@ -2042,7 +1916,7 @@ def build_retrieval_dataset(
     print(f"   Dataset ID: {dataset.id}")
 ```
 
-#### 5.2.2 自定义Evaluators
+##### 5.2.2 自定义Evaluators
 
 ```python
 # evaluators.py
@@ -2134,7 +2008,7 @@ def latency_evaluator(run, example):
     }
 ```
 
-#### 5.2.3 运行自动化评估
+##### 5.2.3 运行自动化评估
 
 ```python
 # run_evaluation.py
@@ -2192,7 +2066,7 @@ print(f"MRR: {results['mrr_avg']:.3f}")
 print(f"延迟评分: {results['latency_score_avg']:.2f}")
 ```
 
-#### 5.2.4 权重优化实验
+##### 5.2.4 权重优化实验
 
 ```python
 # optimize_weights.py
@@ -2286,9 +2160,9 @@ print("\n📊 结果图表已保存: weight_optimization.png")
 
 ---
 
-### 5.3 性能优化技巧
+#### 5.3 性能优化技巧
 
-#### 5.3.1 并发检索优化
+##### 5.3.1 并发检索优化
 
 **问题**: 串行执行向量检索和BM25检索，延迟翻倍
 
@@ -2332,7 +2206,7 @@ vector_results, bm25_results = asyncio.run(
 # 并发: max(300ms, 200ms) = 300ms ⬅️ 提速40%
 ```
 
-#### 5.3.2 缓存策略
+##### 5.3.2 缓存策略
 
 **1. 查询缓存**：
 
@@ -2421,7 +2295,7 @@ def retrieve_with_cache(query: str) -> List[Document]:
     return results
 ```
 
-#### 5.3.3 批处理优化
+##### 5.3.3 批处理优化
 
 ```python
 from typing import List, Dict
@@ -2470,9 +2344,9 @@ results = asyncio.run(
 
 ---
 
-### 5.4 监控与告警
+#### 5.4 监控与告警
 
-#### 5.4.1 LangSmith集成监控
+##### 5.4.1 LangSmith集成监控
 
 ```python
 import os
@@ -2514,7 +2388,7 @@ def retrieve_with_monitoring(query: str) -> Dict:
     return result
 ```
 
-#### 5.4.2 自定义监控Dashboard
+##### 5.4.2 自定义监控Dashboard
 
 ```python
 # monitoring_dashboard.py
@@ -2590,7 +2464,7 @@ class MonitoringDashboard:
 
 ---
 
-### 5.5 总结：生产清单
+#### 5.5 总结：生产清单
 
 **部署前检查清单**：
 

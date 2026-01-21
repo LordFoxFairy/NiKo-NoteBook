@@ -119,7 +119,9 @@ ComfyUI:
 
 ## 5.2 环境搭建
 
-### 5.2.1 安装步骤 (Windows)
+### 5.2.1 安装步骤
+
+#### Windows安装
 
 ```bash
 # 方法1: 便携版（推荐）
@@ -152,6 +154,200 @@ pip install -r requirements.txt
 
 # 运行
 python main.py
+```
+
+---
+
+#### macOS安装 (Apple Silicon M1/M2/M3/M4) ⭐
+
+**步骤1: 克隆仓库**
+
+```bash
+# 选择安装位置（推荐Documents或专用AI目录）
+cd ~/Documents
+git clone https://github.com/comfyanonymous/ComfyUI.git
+cd ComfyUI
+```
+
+**步骤2: 创建Python环境**
+
+```bash
+# 使用Python 3.10或3.11（推荐3.11）
+python3 -m venv venv
+source venv/bin/activate
+```
+
+**步骤3: 安装PyTorch（Apple Silicon版本）**
+
+```bash
+# 安装支持Metal加速的PyTorch
+pip install --upgrade pip
+pip install torch torchvision torchaudio
+
+# 验证Metal是否可用
+python3 -c "import torch; print('Metal可用:', torch.backends.mps.is_available())"
+# 应该输出: Metal可用: True
+```
+
+**步骤4: 安装ComfyUI依赖**
+
+```bash
+pip install -r requirements.txt
+```
+
+**步骤5: 首次启动（重要配置）**
+
+```bash
+# M4 48GB推荐启动参数
+python main.py --highvram
+
+# 首次启动会看到:
+# To see the GUI go to: http://127.0.0.1:8188
+```
+
+**步骤6: 下载基础模型（必需）**
+
+```bash
+# 创建模型目录
+cd models/checkpoints
+
+# 下载SDXL Base（推荐首选）
+# 访问 https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+# 下载 sd_xl_base_1.0.safetensors (6.94GB)
+# 放入 models/checkpoints/ 目录
+
+# 或使用命令行下载
+wget https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors
+
+# 返回ComfyUI根目录
+cd ../..
+```
+
+**步骤7: 重启ComfyUI**
+
+```bash
+# 激活环境（如果未激活）
+source venv/bin/activate
+
+# 启动
+python main.py --highvram
+```
+
+**步骤8: 验证安装**
+
+打开浏览器访问 `http://127.0.0.1:8188`，应该看到ComfyUI界面，并且在Load Checkpoint节点中能看到下载的模型。
+
+---
+
+#### macOS启动参数详解（M4 48GB专用优化）
+
+```bash
+# 标准启动（推荐）
+python main.py --highvram
+
+# 参数说明:
+# --highvram: 针对大内存设备优化（16GB+），你的48GB完全适用
+# --normalvram: 如果遇到问题可降级使用
+# --lowvram: 低内存模式（<8GB），不适合你
+# --novram: 极低内存模式，不推荐
+
+# 指定端口（如果8188被占用）
+python main.py --highvram --port 8189
+
+# 允许远程访问（局域网内其他设备访问）
+python main.py --highvram --listen 0.0.0.0
+
+# 后台运行
+nohup python main.py --highvram > comfyui.log 2>&1 &
+# 查看日志: tail -f comfyui.log
+# 停止: pkill -f "python main.py"
+```
+
+---
+
+#### macOS性能优化配置
+
+**配置1: 启用Metal性能统计**
+
+```bash
+# 创建配置文件
+cat > extra_model_paths.yaml << 'EOF'
+# ComfyUI配置文件
+# Metal优化配置
+pytorch:
+  metal_performance_shaders: true
+EOF
+```
+
+**配置2: 模型加载优化**
+
+在ComfyUI界面 → Settings → 勾选以下选项:
+- ✅ `Always keep models in VRAM` (48GB足够)
+- ✅ `Enable FP16 optimization` (加速推理)
+- ✅ `Use PyTorch cross attention` (Metal优化)
+
+**配置3: 批量生成优化**
+
+```bash
+# 如果批量生成大量图片，使用以下启动参数
+python main.py --highvram --preview-method auto
+```
+
+---
+
+#### 常见问题排查
+
+**问题1: Metal不可用**
+
+```bash
+# 检查PyTorch版本
+pip list | grep torch
+# 应该看到 torch 2.x.x
+
+# 重新安装Metal版本
+pip uninstall torch torchvision torchaudio
+pip install torch torchvision torchaudio
+```
+
+**问题2: 模型加载失败**
+
+```bash
+# 检查模型文件
+ls -lh models/checkpoints/
+# 确保.safetensors文件完整下载
+
+# 检查权限
+chmod 644 models/checkpoints/*.safetensors
+```
+
+**问题3: 端口8188被占用**
+
+```bash
+# 查找占用进程
+lsof -i :8188
+# 杀掉进程或换端口启动
+python main.py --port 8189
+```
+
+**问题4: 生成速度慢**
+
+```bash
+# 确认使用Metal加速
+# 在ComfyUI运行时，打开Activity Monitor（活动监视器）
+# 查看GPU栏，应该看到python进程占用GPU
+
+# 如果GPU未被使用，检查:
+python3 -c "import torch; print(torch.backends.mps.is_built())"
+# 应该返回 True
+```
+
+**问题5: 内存不足（理论上48GB不会遇到）**
+
+```bash
+# 降级启动参数
+python main.py --normalvram
+
+# 或减小批次大小（在工作流中设置batch_size=1）
 ```
 
 ### 5.2.2 目录结构
