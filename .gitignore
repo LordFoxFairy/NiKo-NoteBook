@@ -9,3 +9,7 @@
 **backup**
 .idea
 .langchain_backups
+uv.lock
+pyproject.toml
+*.py
+.python-version

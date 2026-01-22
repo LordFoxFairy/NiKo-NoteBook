@@ -36,61 +36,43 @@ agent = create_agent(
 result = agent.invoke({"messages": [("user", "搜索最新新闻")]})
 ```
 
-**内部执行流程**:
+**内部执行流程**：
 
-```mermaid
-graph LR
-    A[用户输入] --> B[模型推理]
-    B --> C{需要工具?}
-    C -->|是| D[调用工具]
-    D --> B
-    C -->|否| E[返回结果]
-```
+<img src="./assets/image-20260122210222416.png" alt="image-20260122210222416" style="zoom:50%;" />
 
-**问题**: 这个流程是"黑盒",我们无法干预中间步骤。
+**问题**: 这个流程是"黑盒",我们无法干预中间步骤。而 Middleware 正是解决这个问题的关键机制。
 
-#### 1.1.2 Middleware的切入点
+#### 1.1.2 Middleware的切入点与生命周期
 
-**Middleware**在Agent执行的关键节点提供**Hook(钩子)**,允许你:
+**Middleware**在Agent执行的关键节点提供**Hook(钩子)**,允许你精准干预。下图展示了 Agent Loop 与 Middleware Hooks 的交互流程,清晰呈现每个 Hook 的触发时机:
 
-1. **before_agent**: Agent开始前 - 做权限检查、输入验证
-2. **before_model**: 调用模型前 - 修改提示词、检查Token
-3. **wrap_model_call**: 包装模型调用 - 缓存、重试、降级
-4. **after_model**: 模型响应后 - 审核输出、记录日志
-5. **wrap_tool_call**: 包装工具调用 - 重试、限流、审批
-6. **after_agent**: Agent结束后 - 保存结果、计费
+**Middleware Lifecycle (生命周期)**
 
-**完整流程**:
+<img src="./assets/image-20260122205654033.png" alt="image-20260122205654033" style="zoom:50%;" />
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant before_agent
-    participant before_model
-    participant wrap_model_call
-    participant Model
-    participant after_model
-    participant wrap_tool_call
-    participant Tool
-    participant after_agent
+**核心流程说明**:
 
-    User->>before_agent: 输入
-    before_agent->>before_model: state
-    before_model->>wrap_model_call: state
-    wrap_model_call->>Model: request
-    Model-->>wrap_model_call: response
-    wrap_model_call->>after_model: state
+1. **用户请求** → `before_agent` Hook: 权限检查、输入验证、初始化
+2. `before_model` Hook → **模型推理前**: 修改提示词、检查 Token、条件跳转
+3. `wrap_model_call` Hook → **包装模型调用**: 缓存、重试、降级、成本控制
+4. **模型响应** → `after_model` Hook: 审核输出、记录日志、质量评分
+5. 如需工具 → `wrap_tool_call` Hook → **工具执行**: 重试、限流、审批、模拟执行 → 返回循环
+6. 无需工具 → `after_agent` Hook → **Agent 结束**: 保存结果、计费、清理资源
 
-    alt 需要工具
-        after_model->>wrap_tool_call: tool_call
-        wrap_tool_call->>Tool: execute
-        Tool-->>wrap_tool_call: result
-        wrap_tool_call->>before_model: 继续循环
-    else 不需要工具
-        after_model->>after_agent: final state
-        after_agent-->>User: 结果
-    end
-```
+**Hook 快速参考**
+
+| Hook 名称 | 类型 | 签名 | 典型用途 |
+|----------|------|------|---------|
+| `before_agent` | Node-Style | `(state, runtime) -> dict\|None` | 权限检查、输入验证、初始化 |
+| `before_model` | Node-Style | `(state, runtime) -> dict\|None` | 修改提示词、检查 Token、条件跳转 |
+| `wrap_model_call` | Wrap-Style | `(request, handler) -> ModelResponse` | 缓存、重试、降级、成本控制 |
+| `after_model` | Node-Style | `(state, runtime) -> dict\|None` | 审核输出、记录日志、质量评分 |
+| `wrap_tool_call` | Wrap-Style | `(request, handler) -> ToolMessage` | 重试、限流、审批、模拟执行 |
+| `after_agent` | Node-Style | `(state, runtime) -> dict\|None` | 保存结果、计费、清理资源 |
+
+> **类型说明**:
+> - **Node-Style**: 顺序执行,返回 `dict` 修改 state,返回 `None` 沿用原值
+> - **Wrap-Style**: 嵌套执行(洋葱模型),完全控制调用流程,可短路返回
 
 #### 1.1.3 核心价值
 
@@ -102,11 +84,184 @@ sequenceDiagram
 | **可观测** | 黑盒执行 | LoggingMiddleware记录所有步骤 |
 | **合规** | 无人工审批 | HumanInTheLoopMiddleware强制审批 |
 
+**小节总结**:
+
+通过上面的流程图和说明,我们理解了:
+1. **Agent 的执行流程**: 从用户输入到模型推理,再到工具调用,最后返回结果
+2. **Middleware 的介入点**: 在执行流程的每个关键节点(before/after/wrap)提供 Hook
+3. **六大 Hook**: 从 before_agent 到 after_agent,覆盖整个生命周期,分为 Node-Style 和 Wrap-Style 两类
+4. **实际价值**: 安全、成本、可靠性、可观测、合规等多个维度的精准控制
+
+接下来我们将先创建第一个 Middleware 上手实践,然后深入学习 Hook 体系的技术细节。
+
 ---
 
-### 1.2 六大Hook体系
+### 1.2 创建第一个Middleware
 
-#### 1.2.1 Hook分类
+#### 1.2.1 方式1: 使用Decorator
+
+**最简单的方式** - 使用decorator快速创建middleware:
+
+```python
+from langchain.agents.middleware import before_model, after_model
+
+@before_model
+def log_before_model(state, runtime):
+    """模型调用前打印日志"""
+    print(f"[LOG] 准备调用模型,当前消息数: {len(state['messages'])}")
+    return None  # 不修改state
+
+@after_model
+def log_after_model(state, runtime):
+    """模型调用后打印日志"""
+    last_msg = state["messages"][-1]
+    print(f"[LOG] 模型返回: {last_msg.content[:50]}...")
+    return None
+
+# 使用
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model="gpt-4o",
+    tools=[],
+    middleware=[log_before_model, log_after_model]
+)
+```
+
+**支持的decorators**:
+- `@before_agent`
+- `@before_model(can_jump_to=["end"])`  # 可指定允许跳转的目标
+- `@after_model`
+- `@after_agent`
+- `@wrap_model_call`
+- `@wrap_tool_call`
+- `@dynamic_prompt`  # 动态生成system prompt
+
+#### 1.2.2 方式2: 继承AgentMiddleware
+
+**更灵活的方式** - 继承`AgentMiddleware`类:
+
+```python
+from langchain.agents.middleware import AgentMiddleware
+
+class TokenCounterMiddleware(AgentMiddleware):
+    """统计Token使用量"""
+
+    def before_agent(self, state, runtime):
+        """初始化计数器"""
+        # 注意: 不能在state中添加自定义字段,因为AgentState是固定的
+        # 可以使用runtime.context存储自定义数据
+        return None
+
+    def before_model(self, state, runtime):
+        """模型调用前统计"""
+        # 简单估算: 每个message约100 tokens
+        approx_tokens = len(state["messages"]) * 100
+        print(f"📊 预估输入Token: {approx_tokens}")
+        return None
+
+    def after_model(self, state, runtime):
+        """模型调用后统计"""
+        # 真实环境可以从response.usage中获取
+        print(f"📊 模型调用完成")
+        return None
+
+# 使用
+agent = create_agent(
+    model="gpt-4o",
+    tools=[],
+    middleware=[TokenCounterMiddleware()]
+)
+```
+
+#### 1.2.3 实战: wrap_model_call实现缓存
+
+```python
+from langchain.agents.middleware import wrap_model_call
+from langchain_core.messages import AIMessage
+import hashlib
+import json
+
+# 简单的内存缓存
+_cache = {}
+
+@wrap_model_call
+def cache_middleware(request, handler):
+    """缓存模型响应"""
+
+    # 1. 计算缓存键(基于messages内容)
+    messages_str = json.dumps([
+        {"role": m.type, "content": str(m.content)}
+        for m in request.messages
+    ], sort_keys=True)
+    cache_key = hashlib.md5(messages_str.encode()).hexdigest()
+
+    # 2. 检查缓存
+    if cache_key in _cache:
+        print("✅ 缓存命中!")
+        return _cache[cache_key]
+
+    # 3. 缓存未命中,调用模型
+    print("❌ 缓存未命中,调用模型...")
+    response = handler(request)
+
+    # 4. 保存到缓存
+    _cache[cache_key] = response
+
+    return response
+
+# 测试
+agent = create_agent(
+    model="gpt-4o-mini",  # 使用mini测试
+    tools=[],
+    middleware=[cache_middleware]
+)
+
+# 第一次调用
+result1 = agent.invoke({"messages": [("user", "hi")]})
+# 输出: ❌ 缓存未命中,调用模型...
+
+# 第二次相同输入
+result2 = agent.invoke({"messages": [("user", "hi")]})
+# 输出: ✅ 缓存命中!
+```
+
+#### 1.2.4 实战: wrap_tool_call实现重试
+
+```python
+from langchain.agents.middleware import wrap_tool_call
+from langchain_core.messages import ToolMessage
+import time
+
+@wrap_tool_call
+def retry_on_error(request, handler):
+    """工具调用失败时重试3次"""
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            result = handler(request)
+            print(f"✅ 工具调用成功 (尝试 {attempt + 1})")
+            return result
+        except Exception as e:
+            print(f"❌ 工具调用失败 (尝试 {attempt + 1}): {e}")
+
+            if attempt == max_retries - 1:
+                # 最后一次仍失败,返回错误消息
+                return ToolMessage(
+                    content=f"工具调用失败(重试{max_retries}次): {str(e)}",
+                    tool_call_id=request.tool_call["id"]
+                )
+
+            # 指数退避
+            time.sleep(2 ** attempt)
+```
+
+---
+
+### 1.3 Hook体系深入理解
+
+#### 1.3.1 Hook分类
 
 LangChain Middleware提供**6个Hook**,分为两类:
 
@@ -122,7 +277,7 @@ LangChain Middleware提供**6个Hook**,分为两类:
 - 完全控制调用流程,可短路返回
 - Hooks: `wrap_model_call`, `wrap_tool_call`
 
-#### 1.2.2 Hook签名详解
+#### 1.3.2 Hook签名详解
 
 **Node-Style Hook签名**:
 
@@ -168,7 +323,7 @@ def wrap_model_call(
     return response
 ```
 
-#### 1.2.3 核心类型
+#### 1.3.3 核心类型
 
 **1. AgentState**
 
@@ -226,237 +381,9 @@ class ModelResponse:
 
 ---
 
-### 1.3 创建第一个Middleware
+### 1.4 jump_to: 条件跳转
 
-#### 1.3.1 方式1: 使用Decorator
-
-**最简单的方式** - 使用decorator快速创建middleware:
-
-```python
-from langchain.agents.middleware import before_model, after_model
-
-@before_model
-def log_before_model(state, runtime):
-    """模型调用前打印日志"""
-    print(f"[LOG] 准备调用模型,当前消息数: {len(state['messages'])}")
-    return None  # 不修改state
-
-@after_model
-def log_after_model(state, runtime):
-    """模型调用后打印日志"""
-    last_msg = state["messages"][-1]
-    print(f"[LOG] 模型返回: {last_msg.content[:50]}...")
-    return None
-
-# 使用
-from langchain.agents import create_agent
-
-agent = create_agent(
-    model="gpt-4o",
-    tools=[],
-    middleware=[log_before_model, log_after_model]
-)
-```
-
-**支持的decorators**:
-- `@before_agent`
-- `@before_model(can_jump_to=["end"])`  # 可指定允许跳转的目标
-- `@after_model`
-- `@after_agent`
-- `@wrap_model_call`
-- `@wrap_tool_call`
-- `@dynamic_prompt`  # 动态生成system prompt
-
-#### 1.3.2 方式2: 继承AgentMiddleware
-
-**更灵活的方式** - 继承`AgentMiddleware`类:
-
-```python
-from langchain.agents.middleware import AgentMiddleware
-
-class TokenCounterMiddleware(AgentMiddleware):
-    """统计Token使用量"""
-
-    def before_agent(self, state, runtime):
-        """初始化计数器"""
-        # 注意: 不能在state中添加自定义字段,因为AgentState是固定的
-        # 可以使用runtime.context存储自定义数据
-        return None
-
-    def before_model(self, state, runtime):
-        """模型调用前统计"""
-        # 简单估算: 每个message约100 tokens
-        approx_tokens = len(state["messages"]) * 100
-        print(f"📊 预估输入Token: {approx_tokens}")
-        return None
-
-    def after_model(self, state, runtime):
-        """模型调用后统计"""
-        # 真实环境可以从response.usage中获取
-        print(f"📊 模型调用完成")
-        return None
-
-# 使用
-agent = create_agent(
-    model="gpt-4o",
-    tools=[],
-    middleware=[TokenCounterMiddleware()]
-)
-```
-
-#### 1.3.3 实战: wrap_model_call实现缓存
-
-```python
-from langchain.agents.middleware import wrap_model_call
-from langchain_core.messages import AIMessage
-import hashlib
-import json
-
-# 简单的内存缓存
-_cache = {}
-
-@wrap_model_call
-def cache_middleware(request, handler):
-    """缓存模型响应"""
-
-    # 1. 计算缓存键(基于messages内容)
-    messages_str = json.dumps([
-        {"role": m.type, "content": str(m.content)}
-        for m in request.messages
-    ], sort_keys=True)
-    cache_key = hashlib.md5(messages_str.encode()).hexdigest()
-
-    # 2. 检查缓存
-    if cache_key in _cache:
-        print("✅ 缓存命中!")
-        return _cache[cache_key]
-
-    # 3. 缓存未命中,调用模型
-    print("❌ 缓存未命中,调用模型...")
-    response = handler(request)
-
-    # 4. 保存到缓存
-    _cache[cache_key] = response
-
-    return response
-
-# 测试
-agent = create_agent(
-    model="gpt-4o-mini",  # 使用mini测试
-    tools=[],
-    middleware=[cache_middleware]
-)
-
-# 第一次调用
-result1 = agent.invoke({"messages": [("user", "hi")]})
-# 输出: ❌ 缓存未命中,调用模型...
-
-# 第二次相同输入
-result2 = agent.invoke({"messages": [("user", "hi")]})
-# 输出: ✅ 缓存命中!
-```
-
-#### 1.3.4 实战: wrap_tool_call实现重试
-
-```python
-from langchain.agents.middleware import wrap_tool_call
-from langchain_core.messages import ToolMessage
-import time
-
-@wrap_tool_call
-def retry_on_error(request, handler):
-    """工具调用失败时重试3次"""
-
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            result = handler(request)
-            print(f"✅ 工具调用成功 (尝试 {attempt + 1})")
-            return result
-        except Exception as e:
-            print(f"❌ 工具调用失败 (尝试 {attempt + 1}): {e}")
-
-            if attempt == max_retries - 1:
-                # 最后一次仍失败,返回错误消息
-                return ToolMessage(
-                    content=f"工具调用失败(重试{max_retries}次): {str(e)}",
-                    tool_call_id=request.tool_call["id"]
-                )
-
-            # 指数退避
-            time.sleep(2 ** attempt)
-```
-
----
-
-### 1.4 Hook执行顺序
-
-#### 1.4.1 多个Middleware的执行顺序
-
-当传入多个middleware时,执行顺序规则:
-
-```python
-middleware = [A, B, C]
-
-# before_* hooks: 顺序执行 A → B → C
-# wrap_* hooks: 嵌套执行 A包装B包装C (洋葱模型)
-# after_* hooks: 逆序执行 C → B → A
-```
-
-**示例**:
-
-```python
-@before_model
-def middleware_a(state, runtime):
-    print("A: before_model")
-    return None
-
-@before_model
-def middleware_b(state, runtime):
-    print("B: before_model")
-    return None
-
-@after_model
-def middleware_c(state, runtime):
-    print("C: after_model")
-    return None
-
-agent = create_agent(
-    model="gpt-4o-mini",
-    tools=[],
-    middleware=[middleware_a, middleware_b, middleware_c]
-)
-
-agent.invoke({"messages": [("user", "hi")]})
-
-# 输出顺序:
-# A: before_model
-# B: before_model
-# (模型调用)
-# C: after_model
-```
-
-**wrap_* hooks的洋葱模型**:
-
-```python
-# 假设有3个wrap_model_call middleware: [A, B, C]
-# 实际执行:
-def final_call(request):
-    return A.wrap_model_call(request, lambda r1:
-        B.wrap_model_call(r1, lambda r2:
-            C.wrap_model_call(r2, lambda r3:
-                actual_model_call(r3)
-            )
-        )
-    )
-# A最外层,C最内层
-```
-
----
-
-### 1.5 jump_to: 条件跳转
-
-#### 1.5.1 什么是jump_to
+#### 1.4.1 什么是jump_to
 
 在`before_model`或`after_model` hook中,可以返回`{"jump_to": "end"}`来提前结束Agent执行:
 
@@ -470,7 +397,7 @@ def final_call(request):
 - 检测到特定条件,跳过模型调用
 - 实现自定义的路由逻辑
 
-#### 1.5.2 实战: 早退出Middleware
+#### 1.4.2 实战: 早退出Middleware
 
 ```python
 from langchain.agents.middleware import before_model
@@ -541,6 +468,22 @@ result = agent.invoke({"messages": [("user", "再见")]})
 > **本章目标**: 掌握所有内置Middleware的使用,以及自定义开发方法
 
 LangChain提供了11个内置Middleware,覆盖安全、可靠性、性能等场景。本章按功能分类讲解。
+
+**内置 Middleware 总览表**:
+
+| 类别 | Middleware 名称 | 核心功能 | 典型场景 |
+|------|----------------|---------|---------|
+| **安全** | `PIIMiddleware` | 敏感信息检测与脱敏 | 保护邮箱、手机号、信用卡等隐私 |
+| | `HumanInTheLoopMiddleware` | 人工介入审批 | 敏感操作(支付、删除)需人工确认 |
+| **可靠性** | `ModelCallLimitMiddleware` | 限制模型调用次数 | 防止死循环、控制成本 |
+| | `ToolCallLimitMiddleware` | 限制工具调用次数 | 防止单一工具过度调用 |
+| | `ToolRetryMiddleware` | 失败自动重试 | 处理网络波动、临时故障 |
+| | `ModelFallbackMiddleware` | 模型降级 | 主模型挂掉时切换备用模型 |
+| **性能** | `SummarizationMiddleware` | 自动对话摘要 | 避免 Context Window 超限 |
+| | `ContextEditingMiddleware` | 上下文裁剪 | 清理不需要的历史信息 |
+| **增强** | `TodoListMiddleware` | 任务规划与追踪 | 为 Agent 增加长任务管理能力 |
+| | `LLMToolSelectorMiddleware` | 智能工具筛选 | 解决工具过多(50+)导致模型困惑的问题 |
+| | `LLMToolEmulator` | 工具模拟 | 测试/开发阶段模拟昂贵工具 |
 
 ### 2.1 安全类Middleware
 
@@ -1996,12 +1939,123 @@ class MetricsMiddleware(AgentMiddleware):
 
 ---
 
-**参考资源**:
+---
 
-- [LangChain Agents官方文档](https://docs.langchain.com/oss/python/langchain/agents)
-- [Middleware API Reference](https://reference.langchain.com/python/langchain/middleware/)
-- [LangGraph Runtime](https://langchain-ai.github.io/langgraph/reference/runtime/)
+## 深入阅读 (Additional Resources)
+
+### 官方文档
+
+**LangChain Agents 与 Middleware**:
+- [LangChain Agents 核心文档](https://docs.langchain.com/oss/python/langchain/agents) - Agents 的完整介绍
+- [Middleware 概念指南](https://docs.langchain.com/oss/python/langchain/middleware) - Middleware 的设计理念和使用场景
+- [Middleware API Reference](https://reference.langchain.com/python/langchain/middleware/) - 完整的 API 参考文档
+- [内置 Middleware 列表](https://docs.langchain.com/oss/python/langchain/middleware#built-in-middleware) - 所有内置 Middleware 的详细说明
+
+**LangGraph Runtime**:
+
+- [Runtime 文档](https://langchain-ai.github.io/langgraph/reference/runtime/) - Runtime 和 Context 的使用
+- [Checkpointer 机制](https://langchain-ai.github.io/langgraph/how-tos/persistence/) - 持久化与断点续传
+- [Human-in-the-Loop](https://langchain-ai.github.io/langgraph/how-tos/human_in_the_loop/) - 人工介入的最佳实践
+
+### 设计模式与最佳实践
+
+**Middleware 设计模式**:
+- [Middleware Pattern in Software Engineering](https://en.wikipedia.org/wiki/Middleware_(distributed_applications)) - 软件工程中的 Middleware 模式
+- [Onion Architecture](https://jeffreypalermo.com/2008/07/the-onion-architecture-part-1/) - 洋葱架构(wrap_* hooks 的设计思想)
+- [Chain of Responsibility Pattern](https://refactoring.guru/design-patterns/chain-of-responsibility) - 责任链模式
+
+**Agent 工程化**:
+- [LangSmith 追踪与监控](https://docs.smith.langchain.com/) - 生产环境的可观测性
+- [Agent 安全最佳实践](https://docs.langchain.com/security) - PII 保护、输入验证、工具安全
+- [成本优化指南](https://docs.langchain.com/optimization/cost) - Token 管理、缓存策略、模型选择
+
+### 相关技术文章
+
+**官方博客**:
+- [Introducing LangChain Middleware](https://blog.langchain.dev/middleware) - Middleware 的发布公告
+- [Building Production-Ready Agents](https://blog.langchain.dev/production-agents) - 生产级 Agent 的构建经验
+- [Agent Reliability Patterns](https://blog.langchain.dev/reliability) - 可靠性模式详解
+
+**社区实践**:
+- [Real-World Middleware Examples](https://github.com/langchain-ai/langchain/tree/master/cookbook/middleware) - LangChain Cookbook 中的 Middleware 示例
+- [Advanced Agent Architectures](https://github.com/langchain-ai/langgraph/tree/main/examples) - LangGraph 官方示例仓库
+
+### 工具与库
+
+**相关工具**:
+- [LangSmith](https://smith.langchain.com) - Agent 追踪、评估和监控平台
+- [LangServe](https://github.com/langchain-ai/langserve) - Agent 部署工具
+- [LangChain Templates](https://github.com/langchain-ai/langchain/tree/master/templates) - 预构建的 Agent 模板
+
+**开源项目参考**:
+- [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) - 使用 Middleware 实现复杂 Agent
+- [BabyAGI](https://github.com/yoheinakajima/babyagi) - 任务规划型 Agent 的参考实现
+
+### 学习路径建议
+
+**初学者**:
+1. 先学习第1章的核心概念和基础 Hook
+2. 动手实践第1章的所有代码示例
+3. 尝试自定义一个简单的 LoggingMiddleware
+4. 阅读官方文档的 "Getting Started" 部分
+
+**进阶开发者**:
+1. 深入理解第2章的所有内置 Middleware
+2. 学习第3章的组合策略和测试方法
+3. 构建生产级 Middleware Stack
+4. 阅读 LangChain 源码中的 Middleware 实现
+
+**架构师**:
+1. 研究 Middleware 与 LangGraph 的集成机制
+2. 设计企业级 Middleware 框架
+3. 制定团队的 Middleware 开发规范
+4. 探索高级话题(性能优化、安全加固、成本控制)
+
+### 常见问题解答
+
+**问: Middleware 和 LangGraph 的 Edge/Node 有什么区别?**
+
+答:
+- **Middleware**: 横切关注点(cross-cutting concerns),如日志、安全、限流,作用于整个 Agent 生命周期
+- **LangGraph Node/Edge**: 业务逻辑的流程控制,定义 Agent 的具体行为
+
+两者配合使用:Middleware 提供通用能力,LangGraph 定义业务流程。
+
+**问: 可以在 Middleware 中修改 tools 列表吗?**
+
+答: 可以!在 `wrap_model_call` 中可以通过 `request.override(tools=new_tools)` 修改工具列表,这正是 `LLMToolSelectorMiddleware` 的实现原理。
+
+**问: Middleware 会影响性能吗?**
+
+答:
+- **轻量级 Middleware**(如日志、计数): 影响微乎其微(<1ms)
+- **包含 LLM 调用的 Middleware**(如 LLMToolSelector): 会增加延迟,需权衡利弊
+- **最佳实践**: 使用性能分析工具(如第3章的 MetricsMiddleware)量化影响
+
+**问: 如何调试 Middleware?**
+
+答:
+1. 使用 `print` 或 logging 输出关键信息
+2. 使用 LangSmith 追踪完整执行流程
+3. 编写单元测试(参考第3章)
+4. 使用 `wrap_model_call` 打印 request/response
+
+### 视频教程推荐
+
+- [LangChain Agents Tutorial (YouTube)](https://www.youtube.com/watch?v=xxx) - 官方视频教程
+- [Building Production Agents (YouTube)](https://www.youtube.com/watch?v=yyy) - 生产实践分享
+
+### 持续更新
+
+LangChain 和 LangGraph 在快速迭代中,建议关注:
+- [LangChain GitHub Releases](https://github.com/langchain-ai/langchain/releases) - 版本更新日志
+- [LangChain Discord](https://discord.gg/langchain) - 社区讨论
+- [LangChain Twitter](https://twitter.com/langchainai) - 官方动态
 
 ---
 
-(全文完成,约18000字)
+**与其他篇章的联系**:
+
+- **第三篇(LangGraph 深入)**: Middleware 运行在 LangGraph 构建的 Agent 之上
+- **第七篇(Deep Agents)**: deepagents 内置了 TodoList 等 Middleware
+- **第十篇(生产实践与监控评估)**: Middleware 可输出指标给 LangSmith
