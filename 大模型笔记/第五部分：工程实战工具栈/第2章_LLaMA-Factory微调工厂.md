@@ -80,6 +80,70 @@ fp16: true                     # 开启混合精度
 llamafactory-cli train custom_sft.yaml
 ```
 
+### 2.3 参数详解：核心配置说明
+
+#### `lora_target` - LoRA 挂载目标
+
+决定 LoRA 权重挂载到模型的哪些层：
+
+```yaml
+lora_target: all  # 推荐：自动检测并挂载所有线性层
+# 或手动指定：
+# lora_target: q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj
+```
+
+**选择策略**：
+- `all`：最佳效果，训练所有 Attention + FFN 层（推荐）
+- `q_proj,v_proj`：最快速度，只训练 Attention 的 Query/Value 投影
+- `q_proj,v_proj,k_proj,o_proj`：平衡方案，训练完整 Attention 层
+
+#### `template` - Prompt 模板
+
+必须与模型的训练格式对齐，否则会导致效果崩溃：
+
+| 模型 | Template 值 | 示例格式 |
+|------|------------|----------|
+| Llama-3 | `llama3` | `<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{user_msg}<|eot_id|>` |
+| Qwen2 | `qwen` | `<|im_start|>user\n{user_msg}<|im_end|>\n<|im_start|>assistant\n` |
+| ChatGLM3 | `chatglm3` | `<|user|>\n{user_msg}<|assistant|>\n` |
+| Llama-2 | `llama2` | `[INST] {user_msg} [/INST]` |
+
+**验证方法**：
+```bash
+# 打印处理后的数据样本，检查格式是否正确
+llamafactory-cli train custom_sft.yaml --do_train false --max_samples 1
+```
+
+#### `stage` - 训练阶段
+
+```yaml
+stage: sft  # Supervised Fine-Tuning（监督微调）
+```
+
+可选值：
+- `pt`：预训练（Pre-training），用于从头训练或继续预训练
+- `sft`：监督微调（Supervised Fine-Tuning），用于指令遵循训练
+- `rm`：奖励模型（Reward Model），用于 RLHF 第二阶段
+- `ppo`：强化学习（Proximal Policy Optimization），用于 RLHF 第三阶段
+- `dpo`：直接偏好优化（Direct Preference Optimization），离线对齐
+
+#### `quantization_bit` - QLoRA 量化
+
+在显存不足时开启：
+
+```yaml
+quantization_bit: 4  # 4-bit 量化，显存占用降低 75%
+# quantization_bit: 8  # 8-bit 量化，显存占用降低 50%（精度更高）
+```
+
+**显存对照表**（LoRA + QLoRA）：
+
+| 模型规模 | 全精度 (bf16) | 4-bit QLoRA | 显存节省 |
+|---------|--------------|-------------|---------|
+| 7B | ~28GB | ~6GB | 78% |
+| 13B | ~52GB | ~10GB | 81% |
+| 70B | ~280GB | ~35GB | 87% |
+
 ---
 
 ## 3. Web UI 零代码微调实战

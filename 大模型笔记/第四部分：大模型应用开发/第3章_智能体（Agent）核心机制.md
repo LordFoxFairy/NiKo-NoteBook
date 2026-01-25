@@ -29,6 +29,11 @@
 - [四、MCP (Model Context Protocol) 革命](#四mcp-model-context-protocol-革命)
 - [五、记忆系统 (Memory) 设计](#五记忆系统-memory-设计)
 - [六、LangGraph:状态机编程范式](#六langgraph状态机编程范式)
+  - 6.1 StateGraph 核心概念
+  - 6.2 实战:基于 LangGraph 的 ReAct Agent
+  - 6.3 条件边与循环控制
+  - 6.4 持久化 (Persistence): Multi-turn 对话的基础
+  - 6.5 Human-in-the-loop: 敏感操作的审批机制
 - [七、多智能体协作 (Multi-Agent)](#七多智能体协作-multi-agent)
 - [八、Output Parser:结构化输出解析](#八output-parser结构化输出解析)
 - [九、本章小结](#九本章小结)
@@ -1301,6 +1306,598 @@ workflow.add_node("tools", lambda state: {
 })
 ```
 
+#### (3) 条件边深度实践: 错误处理与重试机制
+
+生产级 Agent 必须处理工具执行失败的情况。
+
+```python
+from typing import Literal, Optional
+
+class RobustAgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], "对话历史"]
+    retry_count: int
+    last_error: Optional[str]
+
+def should_continue_robust(state: RobustAgentState) -> Literal["continue", "retry", "fail", "end"]:
+    """
+    生产级条件判断:
+    - 检查是否有工具调用
+    - 检查是否有错误需要重试
+    - 检查重试次数是否超限
+    """
+    MAX_RETRIES = 3
+    last_message = state["messages"][-1]
+
+    # 1. 检查是否有错误
+    if state.get("last_error"):
+        if state["retry_count"] >= MAX_RETRIES:
+            return "fail"  # 超过重试次数,直接失败
+        else:
+            return "retry"  # 需要重试
+
+    # 2. 检查是否需要调用工具
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "continue"
+
+    # 3. 正常结束
+    return "end"
+
+def execute_tools_with_error_handling(state: RobustAgentState) -> dict:
+    """工具执行节点 - 带错误处理"""
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    tool_results = []
+    error_occurred = False
+    error_msg = None
+
+    for tool_call in last_message.tool_calls:
+        try:
+            # 执行工具
+            result = tool_executor.invoke(tool_call)
+            tool_results.append(
+                ToolMessage(
+                    content=str(result),
+                    tool_call_id=tool_call["id"]
+                )
+            )
+        except Exception as e:
+            # 捕获错误
+            error_occurred = True
+            error_msg = str(e)
+            tool_results.append(
+                ToolMessage(
+                    content=f"Error: {e}",
+                    tool_call_id=tool_call["id"]
+                )
+            )
+
+    return {
+        "messages": tool_results,
+        "last_error": error_msg if error_occurred else None,
+        "retry_count": state["retry_count"] + 1 if error_occurred else 0
+    }
+
+def handle_failure(state: RobustAgentState) -> dict:
+    """失败处理节点"""
+    error_message = AIMessage(
+        content=f"抱歉,在尝试 {state['retry_count']} 次后仍然失败。错误: {state['last_error']}"
+    )
+    return {"messages": [error_message]}
+
+# 构建带错误处理的工作流
+workflow_robust = StateGraph(RobustAgentState)
+
+workflow_robust.add_node("agent", call_agent)
+workflow_robust.add_node("tools", execute_tools_with_error_handling)
+workflow_robust.add_node("failure_handler", handle_failure)
+
+workflow_robust.set_entry_point("agent")
+
+# 复杂条件边
+workflow_robust.add_conditional_edges(
+    "agent",
+    should_continue_robust,
+    {
+        "continue": "tools",
+        "retry": "agent",      # 重新让 LLM 生成方案
+        "fail": "failure_handler",
+        "end": END
+    }
+)
+
+workflow_robust.add_edge("tools", "agent")
+workflow_robust.add_edge("failure_handler", END)
+
+app_robust = workflow_robust.compile()
+```
+
+### 4. 持久化 (Persistence): Multi-turn 对话的基础
+
+**核心问题**: 默认情况下,LangGraph 的状态是"无状态"的,每次调用都是全新开始。
+对于聊天机器人、长期助手等场景,我们需要**跨会话保存状态**。
+
+#### (1) 使用 MemorySaver (内存级持久化)
+
+适用于开发/测试环境,进程重启后数据会丢失。
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph, END
+
+# 定义状态
+class ChatState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], "对话历史"]
+    user_info: dict  # 存储用户信息
+
+# 定义节点
+def chatbot_node(state: ChatState):
+    """聊天机器人节点"""
+    llm = ChatOpenAI(model="gpt-4", temperature=0.7)
+
+    # 构建系统提示 (包含用户信息)
+    system_prompt = f"你是一个友好的助手。"
+    if state.get("user_info"):
+        system_prompt += f"
+用户信息: {state['user_info']}"
+
+    messages = [SystemMessage(content=system_prompt)] + list(state["messages"])
+    response = llm.invoke(messages)
+
+    return {"messages": [response]}
+
+def extract_user_info(state: ChatState) -> dict:
+    """从对话中提取并更新用户信息"""
+    last_user_message = None
+    for msg in reversed(state["messages"]):
+        if isinstance(msg, HumanMessage):
+            last_user_message = msg.content
+            break
+
+    # 简单的信息提取 (生产环境应该用 NER 或 LLM)
+    user_info = state.get("user_info", {})
+
+    if "我叫" in last_user_message or "My name is" in last_user_message:
+        # 提取名字 (简化版)
+        import re
+        name_match = re.search(r'我叫(.*?)[,。!]', last_user_message)
+        if name_match:
+            user_info["name"] = name_match.group(1).strip()
+
+    return {"user_info": user_info}
+
+# 构建工作流
+workflow = StateGraph(ChatState)
+workflow.add_node("extract_info", extract_user_info)
+workflow.add_node("chatbot", chatbot_node)
+
+workflow.set_entry_point("extract_info")
+workflow.add_edge("extract_info", "chatbot")
+workflow.add_edge("chatbot", END)
+
+# 关键: 添加 Checkpointer
+memory = MemorySaver()
+app = workflow.compile(checkpointer=memory)
+
+# 第一轮对话
+config = {"configurable": {"thread_id": "user_123"}}  # 会话 ID
+
+response1 = app.invoke(
+    {"messages": [HumanMessage(content="你好,我叫张三")]},
+    config=config
+)
+print("Bot:", response1["messages"][-1].content)
+
+# 第二轮对话 (使用相同的 thread_id)
+response2 = app.invoke(
+    {"messages": [HumanMessage(content="我叫什么名字?")]},
+    config=config
+)
+print("Bot:", response2["messages"][-1].content)
+# 输出: "你叫张三" (记住了之前的对话)
+```
+
+**关键点**:
+- `checkpointer=memory`: 启用状态持久化
+- `thread_id`: 用于区分不同用户/会话的唯一标识符
+- 每次调用 `app.invoke()` 时传入相同的 `config`,即可恢复之前的状态
+
+#### (2) 使用 SqliteSaver (磁盘级持久化)
+
+生产环境推荐,数据持久化到 SQLite 数据库。
+
+```python
+from langgraph.checkpoint.sqlite import SqliteSaver
+
+# 创建 SQLite Checkpointer
+db_path = "./checkpoints.db"
+memory = SqliteSaver.from_conn_string(db_path)
+
+# 构建应用 (其他代码同上)
+app = workflow.compile(checkpointer=memory)
+
+# 使用方式完全相同
+config = {"configurable": {"thread_id": "user_456"}}
+
+response = app.invoke(
+    {"messages": [HumanMessage(content="记住这个数字: 42")]},
+    config=config
+)
+
+# 即使进程重启,数据仍然保留
+# 重新创建 app
+memory_new = SqliteSaver.from_conn_string(db_path)
+app_new = workflow.compile(checkpointer=memory_new)
+
+response2 = app_new.invoke(
+    {"messages": [HumanMessage(content="我之前让你记住的数字是什么?")]},
+    config=config
+)
+print(response2["messages"][-1].content)  # 输出: "42"
+```
+
+#### (3) 查看和管理历史状态
+
+```python
+# 获取所有 checkpoint (状态快照)
+checkpoints = list(app.get_state_history(config))
+
+print(f"Total checkpoints: {len(checkpoints)}")
+
+for i, checkpoint in enumerate(checkpoints):
+    print(f"
+Checkpoint {i}:")
+    print(f"  Messages: {len(checkpoint.values['messages'])}")
+    print(f"  Config: {checkpoint.config}")
+
+# 回滚到特定状态
+if len(checkpoints) > 1:
+    previous_state = checkpoints[1]
+    app.update_state(
+        previous_state.config,
+        previous_state.values
+    )
+    print("回滚成功!")
+```
+
+#### (4) 完整的多轮对话示例
+
+```python
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langchain_core.messages import HumanMessage, AIMessage
+import uuid
+
+# 创建持久化应用
+memory = SqliteSaver.from_conn_string("./chat_history.db")
+app = workflow.compile(checkpointer=memory)
+
+def chat_session(user_id: str):
+    """模拟多轮对话"""
+    config = {"configurable": {"thread_id": user_id}}
+
+    print(f"=== Chat Session: {user_id} ===")
+
+    # 第 1 轮
+    print("
+User: 你好,我叫李四,住在北京")
+    r1 = app.invoke(
+        {"messages": [HumanMessage(content="你好,我叫李四,住在北京")]},
+        config=config
+    )
+    print(f"Bot: {r1['messages'][-1].content}")
+
+    # 第 2 轮
+    print("
+User: 我住在哪里?")
+    r2 = app.invoke(
+        {"messages": [HumanMessage(content="我住在哪里?")]},
+        config=config
+    )
+    print(f"Bot: {r2['messages'][-1].content}")
+
+    # 第 3 轮
+    print("
+User: 我的名字是什么?")
+    r3 = app.invoke(
+        {"messages": [HumanMessage(content="我的名字是什么?")]},
+        config=config
+    )
+    print(f"Bot: {r3['messages'][-1].content}")
+
+# 运行
+chat_session("user_001")
+
+# 模拟进程重启
+print("
+
+=== 进程重启 ===
+")
+memory_new = SqliteSaver.from_conn_string("./chat_history.db")
+app_new = workflow.compile(checkpointer=memory_new)
+
+# 继续对话
+config = {"configurable": {"thread_id": "user_001"}}
+print("User: 我们之前聊过什么?")
+r4 = app_new.invoke(
+    {"messages": [HumanMessage(content="我们之前聊过什么?")]},
+    config=config
+)
+print(f"Bot: {r4['messages'][-1].content}")
+```
+
+### 5. Human-in-the-loop: 敏感操作的审批机制
+
+在执行危险操作 (删除文件、发送邮件、支付等) 前,Agent 应该暂停并等待人类审批。
+
+#### (1) 使用 interrupt_before 暂停执行
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph, END
+
+# 定义危险工具
+@tool
+def delete_file(file_path: str) -> str:
+    """删除文件 (危险操作)"""
+    import os
+    try:
+        os.remove(file_path)
+        return f"File {file_path} deleted successfully"
+    except Exception as e:
+        return f"Error deleting file: {e}"
+
+@tool
+def read_file(file_path: str) -> str:
+    """读取文件 (安全操作)"""
+    try:
+        with open(file_path, 'r') as f:
+            return f.read()
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+tools = [delete_file, read_file]
+
+# 定义状态
+class SafeAgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], "对话历史"]
+    pending_approval: Optional[str]  # 等待审批的操作
+
+# 定义节点
+def agent_node(state: SafeAgentState):
+    """Agent 决策节点"""
+    llm = ChatOpenAI(model="gpt-4", temperature=0)
+    llm_with_tools = llm.bind_tools(tools)
+
+    response = llm_with_tools.invoke(state["messages"])
+    return {"messages": [response]}
+
+def check_if_dangerous(state: SafeAgentState) -> str:
+    """检查是否是危险操作"""
+    last_message = state["messages"][-1]
+
+    if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+        return "safe"
+
+    # 检查是否调用了危险工具
+    for tool_call in last_message.tool_calls:
+        if tool_call["name"] in ["delete_file", "send_email", "make_payment"]:
+            return "dangerous"
+
+    return "safe"
+
+def execute_safe_tools(state: SafeAgentState):
+    """执行安全工具"""
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    tool_executor = ToolExecutor(tools)
+    tool_results = []
+
+    for tool_call in last_message.tool_calls:
+        result = tool_executor.invoke(tool_call)
+        tool_results.append(
+            ToolMessage(
+                content=str(result),
+                tool_call_id=tool_call["id"]
+            )
+        )
+
+    return {"messages": tool_results}
+
+def request_approval(state: SafeAgentState):
+    """请求人类审批"""
+    last_message = state["messages"][-1]
+
+    # 提取待审批的操作
+    dangerous_ops = []
+    for tool_call in last_message.tool_calls:
+        dangerous_ops.append(
+            f"Tool: {tool_call['name']}, Args: {tool_call['args']}"
+        )
+
+    approval_msg = AIMessage(
+        content=f"⚠️ 检测到危险操作,需要审批:
+{'
+'.join(dangerous_ops)}
+请输入 'approve' 批准或 'reject' 拒绝。"
+    )
+
+    return {
+        "messages": [approval_msg],
+        "pending_approval": "
+".join(dangerous_ops)
+    }
+
+# 构建工作流
+workflow = StateGraph(SafeAgentState)
+
+workflow.add_node("agent", agent_node)
+workflow.add_node("check_danger", lambda s: s)  # 空节点,仅用于条件判断
+workflow.add_node("request_approval", request_approval)
+workflow.add_node("execute_tools", execute_safe_tools)
+
+workflow.set_entry_point("agent")
+
+# 条件边: agent → check_danger
+workflow.add_edge("agent", "check_danger")
+
+workflow.add_conditional_edges(
+    "check_danger",
+    check_if_dangerous,
+    {
+        "safe": "execute_tools",
+        "dangerous": "request_approval"
+    }
+)
+
+workflow.add_edge("execute_tools", END)
+workflow.add_edge("request_approval", END)  # 暂停,等待人类输入
+
+# 编译 - 关键: interrupt_before
+memory = MemorySaver()
+app = workflow.compile(
+    checkpointer=memory,
+    interrupt_before=["execute_tools"]  # 在执行工具前暂停
+)
+
+# 使用示例
+config = {"configurable": {"thread_id": "session_001"}}
+
+# 第 1 步: 用户请求删除文件
+print("=== Step 1: User Request ===")
+result1 = app.invoke(
+    {"messages": [HumanMessage(content="请删除文件 /tmp/test.txt")]},
+    config=config
+)
+
+print(f"Status: {result1['messages'][-1].content}")
+# 输出: "检测到危险操作,需要审批..."
+
+# 第 2 步: 查看当前状态
+current_state = app.get_state(config)
+print(f"
+Pending approval: {current_state.values.get('pending_approval')}")
+print(f"Next node: {current_state.next}")  # 应该是 ['execute_tools']
+
+# 第 3 步: 人类审批
+print("
+=== Step 2: Human Approval ===")
+user_decision = input("Type 'approve' or 'reject': ")
+
+if user_decision.lower() == "approve":
+    # 继续执行 (resume)
+    result2 = app.invoke(None, config=config)  # None 表示继续执行
+    print(f"Result: {result2['messages'][-1].content}")
+else:
+    # 拒绝 - 手动结束
+    print("Operation rejected by user")
+    app.update_state(
+        config,
+        {"messages": [AIMessage(content="操作已被用户拒绝")]}
+    )
+```
+
+**工作流程**:
+1. Agent 决定调用 `delete_file`
+2. 工作流在 `execute_tools` 前暂停 (`interrupt_before`)
+3. 返回给用户,显示待审批的操作
+4. 人类输入 "approve"
+5. 调用 `app.invoke(None, config)` 继续执行
+
+#### (2) 更优雅的审批流程: 分离审批节点
+
+```python
+def approval_node(state: SafeAgentState):
+    """
+    审批节点 - 从 state 中读取人类输入
+    """
+    messages = state["messages"]
+
+    # 查找最后一条人类消息
+    last_human_msg = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            last_human_msg = msg.content.lower()
+            break
+
+    if last_human_msg == "approve":
+        return {"pending_approval": None}  # 清除审批状态
+    else:
+        # 拒绝
+        return {
+            "messages": [AIMessage(content="操作已被拒绝")],
+            "pending_approval": None
+        }
+
+def should_execute_after_approval(state: SafeAgentState) -> str:
+    """检查审批结果"""
+    last_human_msg = None
+    for msg in reversed(state["messages"]):
+        if isinstance(msg, HumanMessage):
+            last_human_msg = msg.content.lower()
+            break
+
+    if last_human_msg == "approve":
+        return "execute"
+    else:
+        return "reject"
+
+# 构建工作流 (改进版)
+workflow_v2 = StateGraph(SafeAgentState)
+
+workflow_v2.add_node("agent", agent_node)
+workflow_v2.add_node("request_approval", request_approval)
+workflow_v2.add_node("approval_gate", approval_node)
+workflow_v2.add_node("execute_tools", execute_safe_tools)
+
+workflow_v2.set_entry_point("agent")
+
+workflow_v2.add_conditional_edges(
+    "agent",
+    check_if_dangerous,
+    {
+        "safe": "execute_tools",
+        "dangerous": "request_approval"
+    }
+)
+
+workflow_v2.add_edge("request_approval", "approval_gate")
+
+workflow_v2.add_conditional_edges(
+    "approval_gate",
+    should_execute_after_approval,
+    {
+        "execute": "execute_tools",
+        "reject": END
+    }
+)
+
+workflow_v2.add_edge("execute_tools", END)
+
+# 编译 - 在 approval_gate 前暂停
+app_v2 = workflow_v2.compile(
+    checkpointer=MemorySaver(),
+    interrupt_before=["approval_gate"]
+)
+
+# 使用
+config = {"configurable": {"thread_id": "session_002"}}
+
+# 第 1 步: 请求删除
+result = app_v2.invoke(
+    {"messages": [HumanMessage(content="删除 /tmp/test.txt")]},
+    config=config
+)
+print(result["messages"][-1].content)
+
+# 第 2 步: 人类输入审批决策
+result2 = app_v2.invoke(
+    {"messages": [HumanMessage(content="approve")]},
+    config=config
+)
+print(result2["messages"][-1].content)
+```
+
 ---
 
 ## 七、多智能体协作 (Multi-Agent)
@@ -1682,7 +2279,7 @@ except Exception as e:
 ### 核心要点
 
 1. **Workflow > Model**: 优秀的工作流可以让弱模型表现得像强模型
-2. **ReAct vs Plan-and-Solve**: 
+2. **ReAct vs Plan-and-Solve**:
    - ReAct 适合简单任务,灵活但短视
    - Plan-and-Solve 适合复杂任务,需要全局规划
 3. **Memory 是长期对话的关键**:
@@ -1691,12 +2288,19 @@ except Exception as e:
 4. **MCP 是工具集成的未来**: 一次编写,处处运行
 5. **LangGraph 是当前最佳 Agent 框架**: StateGraph 提供清晰的控制流
 6. **Multi-Agent 是处理复杂任务的必经之路**: Supervisor 模式简单有效
+7. **生产级 Agent 三要素** (本章重点补充):
+   - **Conditional Edges (条件边)**: 实现复杂的决策逻辑,包括错误处理、重试机制
+   - **Persistence (持久化)**: MemorySaver/SqliteSaver 实现跨会话状态保存,是 Multi-turn 对话的基础
+   - **Human-in-the-loop**: interrupt_before 机制让 Agent 在执行敏感操作前暂停,等待人类审批
 
 ### 技术栈总结
 
 | 组件 | 推荐技术 | 适用场景 |
 |------|----------|----------|
 | Agent 框架 | LangGraph | 复杂工作流,需要精确控制 |
+| 条件边 | Conditional Edges + Error Handling | 生产级决策逻辑,错误处理与重试 |
+| 持久化 | SqliteSaver (生产) / MemorySaver (开发) | 多轮对话,会话管理,状态恢复 |
+| Human-in-the-loop | interrupt_before / interrupt_after | 敏感操作审批,人类介入决策 |
 | 工具集成 | MCP Protocol | 统一工具接口 |
 | Memory | Vector DB + MemGPT | 长期对话,知识管理 |
 | Output Parsing | Pydantic + LangChain Parsers | 结构化输出 |

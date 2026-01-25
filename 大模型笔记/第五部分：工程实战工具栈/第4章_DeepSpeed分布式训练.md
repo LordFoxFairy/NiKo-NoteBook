@@ -23,6 +23,108 @@
 - **ZeRO-2**: 切分**优化器状态 + 梯度** (Gradients)。显存节省 8 倍。
 - **ZeRO-3**: 切分**优化器状态 + 梯度 + 模型参数** (Parameters)。显存节省与 GPU 数量成正比 (线性扩展)。
 
+### Model States 详解：显存的三大占用来源
+
+在训练过程中，GPU 显存主要被以下三类数据占用（称为 **Model States**）：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              单卡训练的显存占用（以7B模型为例）                  │
+├─────────────────────────────────────────────────────────────┤
+│ 1. 模型参数 (Parameters)                    ~14GB (FP16)    │
+│    - W: 权重矩阵                                             │
+│    - 占用: 2 bytes × 7B = 14GB                              │
+├─────────────────────────────────────────────────────────────┤
+│ 2. 梯度 (Gradients)                         ~14GB (FP16)    │
+│    - dW: 反向传播计算的梯度                                   │
+│    - 占用: 2 bytes × 7B = 14GB                              │
+├─────────────────────────────────────────────────────────────┤
+│ 3. 优化器状态 (Optimizer States)            ~28GB (FP32)    │
+│    - Adam优化器需要维护：                                     │
+│      • m: 一阶动量 (Momentum)                                │
+│      • v: 二阶动量 (Variance)                                │
+│    - 占用: (4+4) bytes × 7B = 56GB                          │
+├─────────────────────────────────────────────────────────────┤
+│ 总计: 14 + 14 + 56 = 84GB                                   │
+│ → 单张24GB显卡无法训练！                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### ZeRO 如何切分这些状态？
+
+**传统 DDP (Data Parallel)**：
+```
+GPU 0: [Parameters] [Gradients] [Optimizer States]  → 84GB
+GPU 1: [Parameters] [Gradients] [Optimizer States]  → 84GB
+GPU 2: [Parameters] [Gradients] [Optimizer States]  → 84GB
+GPU 3: [Parameters] [Gradients] [Optimizer States]  → 84GB
+------------------------------------------------------
+总显存占用: 84GB × 4 = 336GB（完全冗余！）
+```
+
+**ZeRO-1**（切分优化器状态）：
+```
+GPU 0: [Parameters] [Gradients] [Optimizer States 1/4]  → 42GB
+GPU 1: [Parameters] [Gradients] [Optimizer States 2/4]  → 42GB
+GPU 2: [Parameters] [Gradients] [Optimizer States 3/4]  → 42GB
+GPU 3: [Parameters] [Gradients] [Optimizer States 4/4]  → 42GB
+-----------------------------------------------------------------
+每卡显存: 14 + 14 + 14 = 42GB（节省50%）
+```
+
+**ZeRO-2**（切分优化器状态 + 梯度）：
+```
+GPU 0: [Parameters] [Gradients 1/4] [Optimizer States 1/4]  → 28GB
+GPU 1: [Parameters] [Gradients 2/4] [Optimizer States 2/4]  → 28GB
+GPU 2: [Parameters] [Gradients 3/4] [Optimizer States 3/4]  → 28GB
+GPU 3: [Parameters] [Gradients 4/4] [Optimizer States 4/4]  → 28GB
+------------------------------------------------------------------------
+每卡显存: 14 + 3.5 + 14 = 31.5GB（节省62%）
+```
+
+**ZeRO-3**（切分所有状态）：
+```
+GPU 0: [Parameters 1/4] [Gradients 1/4] [Optimizer States 1/4]  → 21GB
+GPU 1: [Parameters 2/4] [Gradients 2/4] [Optimizer States 2/4]  → 21GB
+GPU 2: [Parameters 3/4] [Gradients 3/4] [Optimizer States 3/4]  → 21GB
+GPU 3: [Parameters 4/4] [Gradients 4/4] [Optimizer States 4/4]  → 21GB
+--------------------------------------------------------------------------------
+每卡显存: 3.5 + 3.5 + 14 = 21GB（节省75%）
+```
+
+### ZeRO-3 + Offload 的终极优化
+
+当显存仍然不够时，可以将部分状态卸载到 CPU 内存：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  GPU 显存 (24GB)                        │
+├─────────────────────────────────────────────────────────┤
+│  • Parameters (分片): 3.5GB                             │
+│  • Gradients (分片): 3.5GB                              │
+│  • Activations: ~10GB                                   │
+│  • 临时缓冲区: ~5GB                                      │
+├─────────────────────────────────────────────────────────┤
+│  总计: ~22GB ✓ 可以跑了！                                │
+└─────────────────────────────────────────────────────────┘
+                    ↕ (通过PCIe传输)
+┌─────────────────────────────────────────────────────────┐
+│               CPU 内存 (256GB+)                          │
+├─────────────────────────────────────────────────────────┤
+│  • Optimizer States (分片): 14GB                        │
+│  • Parameters (冷备份): 3.5GB (可选)                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**关键策略**：
+1. **前向传播时**：从 CPU 加载当前层的参数到 GPU
+2. **反向传播时**：计算梯度后，立即将参数卸载回 CPU
+3. **优化器更新**：在 CPU 上完成，更新后再传回 GPU
+
+**代价**：
+- 训练速度降低 30-50%（受限于 PCIe 带宽）
+- CPU 内存需求增加（推荐 256GB+）
+
 ---
 
 ## 2. 核心：ds_config.json 配置实战

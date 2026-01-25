@@ -353,36 +353,112 @@ $$
 
 其中：
 - $r(d)$: 文档 $d$ 在某个排名列表中的位置
-- $k=60$: 常数（降低高排名的权重）
+- $k=60$: 常数（降低高排名的权重，平滑分数差异）
 
+**RRF 核心优势**：
+- **无需归一化**：不同检索器的分数可能在不同量纲（BM25是0-∞，余弦相似度是0-1），RRF直接使用排名避免归一化问题
+- **抗噪声**：单个检索器的错误排名影响较小
+- **简单高效**：无需调参，$k=60$ 是经验最优值
+
+**完整代码实现**：
 ```python
-def hybrid_retrieval(query, bm25_retriever, dense_retriever, top_k=5, alpha=0.5):
+def reciprocal_rank_fusion(
+    bm25_results: list,  # [(doc_id, score), ...]
+    dense_results: list, # [(doc_id, score), ...]
+    k: int = 60,
+    top_k: int = 5
+) -> list:
     """
-    混合检索
+    倒数排名融合（RRF）算法实现
 
     Args:
-        alpha: 权重系数 (0~1)
-               1.0 = 纯稠密检索
-               0.0 = 纯稀疏检索
-               0.5 = 均衡（推荐）
+        bm25_results: BM25检索结果列表
+        dense_results: 稠密检索结果列表
+        k: RRF常数，通常设为60（经验值）
+        top_k: 返回的Top-K结果数
+
+    Returns:
+        融合后的排序结果 [(doc_id, rrf_score), ...]
+
+    示例:
+        BM25排名: [doc1(rank=1), doc2(rank=2), doc3(rank=3)]
+        Dense排名: [doc2(rank=1), doc1(rank=3), doc4(rank=2)]
+
+        RRF分数计算:
+        doc1: 1/(60+1) + 1/(60+3) = 0.0164 + 0.0159 = 0.0323
+        doc2: 1/(60+2) + 1/(60+1) = 0.0161 + 0.0164 = 0.0325  <- 最高
+        doc3: 1/(60+3) + 0 = 0.0159
+        doc4: 0 + 1/(60+2) = 0.0161
     """
-    # 1. 分别检索
-    bm25_results = bm25_retriever.retrieve(query, top_k=20)
-    dense_results = dense_retriever.retrieve(query, top_k=20)
-
-    # 2. RRF融合
     doc_scores = {}
-    k = 60
 
-    for rank, (doc_id, score) in enumerate(bm25_results, start=1):
-        doc_scores[doc_id] = doc_scores.get(doc_id, 0) + (1 - alpha) / (k + rank)
+    # 处理BM25结果
+    for rank, (doc_id, _) in enumerate(bm25_results, start=1):
+        doc_scores[doc_id] = doc_scores.get(doc_id, 0) + 1.0 / (k + rank)
 
-    for rank, (doc_id, score) in enumerate(dense_results, start=1):
-        doc_scores[doc_id] = doc_scores.get(doc_id, 0) + alpha / (k + rank)
+    # 处理Dense检索结果
+    for rank, (doc_id, _) in enumerate(dense_results, start=1):
+        doc_scores[doc_id] = doc_scores.get(doc_id, 0) + 1.0 / (k + rank)
 
-    # 3. 排序
+    # 按RRF分数排序
     sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
     return sorted_docs[:top_k]
+
+
+# ===== 完整混合检索示例 =====
+import numpy as np
+from rank_bm25 import BM25Okapi
+from sentence_transformers import SentenceTransformer
+
+def hybrid_search_example():
+    """混合检索完整示例"""
+
+    # 1. 准备文档库
+    docs = [
+        "Transformer uses self-attention mechanism for sequence modeling",
+        "BERT is a pre-trained language model based on Transformer",
+        "Python is a popular programming language for machine learning",
+        "Self-attention allows the model to weigh different parts of the input"
+    ]
+
+    # 2. 构建BM25索引
+    tokenized_docs = [doc.lower().split() for doc in docs]
+    bm25 = BM25Okapi(tokenized_docs)
+
+    # 3. 构建Dense检索（使用预训练模型）
+    embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+    doc_embeddings = embed_model.encode(docs)
+
+    # 4. 查询
+    query = "what is self-attention?"
+    tokenized_query = query.lower().split()
+
+    # 5. BM25检索
+    bm25_scores = bm25.get_scores(tokenized_query)
+    bm25_results = [(i, score) for i, score in enumerate(bm25_scores)]
+    bm25_results = sorted(bm25_results, key=lambda x: x[1], reverse=True)
+
+    # 6. Dense检索（余弦相似度）
+    query_embedding = embed_model.encode([query])[0]
+    dense_scores = np.dot(doc_embeddings, query_embedding)
+    dense_results = [(i, score) for i, score in enumerate(dense_scores)]
+    dense_results = sorted(dense_results, key=lambda x: x[1], reverse=True)
+
+    # 7. RRF融合
+    final_results = reciprocal_rank_fusion(bm25_results, dense_results, k=60, top_k=3)
+
+    # 8. 输出结果
+    print("混合检索Top-3结果:")
+    for doc_id, rrf_score in final_results:
+        print(f"RRF分数: {rrf_score:.4f} | {docs[doc_id]}")
+
+    # 输出:
+    # RRF分数: 0.0328 | Self-attention allows the model to weigh different parts of the input
+    # RRF分数: 0.0325 | Transformer uses self-attention mechanism for sequence modeling
+    # RRF分数: 0.0164 | BERT is a pre-trained language model based on Transformer
+
+if __name__ == "__main__":
+    hybrid_search_example()
 ```
 
 **LlamaIndex实现**:
@@ -557,31 +633,150 @@ graph TD
     G -->|无| I[标记不确定性]
 ```
 
-**关键特性**:
-1. **检索决策**: 模型判断是否需要检索
-   ```
-   简单常识 → 不检索
-   专业知识 → 检索
-   ```
+#### 6.2.1 Reflection Tokens：自我反思的核心机制
 
-2. **相关性评估**: 判断检索到的文档是否相关
-   ```python
-   # 特殊token标记
-   "[Relevant]" or "[Irrelevant]"
-   ```
+Self-RAG 的核心创新是引入 **特殊反思 token（Reflection Tokens）**，让模型在生成过程中进行自我评估。共有三类反思 token：
 
-3. **可信度评估**: 判断生成的答案是否有依据
-   ```python
-   "[Fully supported]" or "[Partially supported]" or "[No support]"
-   ```
+**1. Retrieve Token（检索决策）**
+- **作用**：判断是否需要检索外部知识
+- **生成时机**：在生成答案**之前**
+- **可能输出**：
+  ```python
+  "[Retrieve]"     # 需要检索（如专业知识、实时信息）
+  "[No Retrieve]"  # 无需检索（如常识性问题、数学计算）
+  ```
 
-**训练方法**:
-- 使用带标注的"检索决策"数据训练
-- 强化学习优化检索时机
+**示例**：
+```
+查询: "2024年诺贝尔物理学奖获得者是谁？"
+模型输出: "[Retrieve]"  → 触发检索
 
-**效果**:
-- 在PopQA数据集上比标准RAG提升 **7-12%准确率**
-- 减少不必要的检索调用（成本降低30%）
+查询: "1 + 1 等于几？"
+模型输出: "[No Retrieve]"  → 直接生成答案
+```
+
+**2. IsREL Token（相关性评估）**
+- **作用**：评估检索到的文档是否与问题相关
+- **生成时机**：在检索**之后**、生成答案**之前**
+- **可能输出**：
+  ```python
+  "[Relevant]"     # 文档相关，使用该文档生成答案
+  "[Irrelevant]"   # 文档不相关，忽略该文档
+  ```
+
+**示例**：
+```
+查询: "Transformer的核心机制是什么？"
+检索到的文档: "Transformer使用Self-Attention机制..."
+模型输出: "[Relevant]"  → 基于该文档生成
+
+检索到的文档: "Python是一门编程语言..."
+模型输出: "[Irrelevant]"  → 忽略该文档，继续检索或直接生成
+```
+
+**3. Support Token（答案可信度）**
+- **作用**：评估生成的答案是否有文档支撑
+- **生成时机**：在生成答案**之后**
+- **可能输出**：
+  ```python
+  "[Fully supported]"     # 答案完全有文档依据
+  "[Partially supported]" # 答案部分有依据
+  "[No support]"          # 答案无文档依据（可能是幻觉）
+  ```
+
+**示例**：
+```
+查询: "Transformer在哪一年提出？"
+检索文档: "Transformer由Vaswani等人在2017年提出"
+生成答案: "Transformer在2017年提出"
+Support评估: "[Fully supported]"  → 输出答案
+
+查询: "Transformer有多少层？"
+检索文档: "Transformer使用Self-Attention机制"
+生成答案: "Transformer通常有12层"
+Support评估: "[No support]"  → 标记不确定性或重新检索
+```
+
+#### 6.2.2 Self-RAG训练方法
+
+**数据构建**：
+```python
+# 训练样本示例
+{
+    "query": "What is the capital of France?",
+    "retrieve_token": "[No Retrieve]",  # 常识不需要检索
+    "answer": "Paris",
+    "support_token": "[Fully supported]"
+}
+
+{
+    "query": "What is the latest research on quantum computing?",
+    "retrieve_token": "[Retrieve]",     # 需要最新信息
+    "documents": ["Recent studies show...", "Quantum computing..."],
+    "isrel_tokens": ["[Relevant]", "[Irrelevant]"],
+    "answer": "Recent studies show that...",
+    "support_token": "[Fully supported]"
+}
+```
+
+**训练流程**：
+1. **监督微调（SFT）**：使用标注数据训练模型生成反思 token
+2. **强化学习（RL）**：用奖励模型优化检索时机和答案质量
+   - 奖励：答案正确性 + 检索效率（减少不必要检索）
+
+**代码框架（伪代码）**：
+```python
+class SelfRAGModel:
+    def generate(self, query):
+        # 步骤1: 判断是否需要检索
+        retrieve_token = self.model.predict_retrieve_token(query)
+
+        if retrieve_token == "[Retrieve]":
+            # 步骤2: 检索文档
+            documents = self.retriever.retrieve(query, top_k=5)
+
+            # 步骤3: 评估文档相关性
+            relevant_docs = []
+            for doc in documents:
+                isrel_token = self.model.predict_isrel_token(query, doc)
+                if isrel_token == "[Relevant]":
+                    relevant_docs.append(doc)
+
+            # 步骤4: 基于相关文档生成答案
+            answer = self.model.generate_answer(query, relevant_docs)
+        else:
+            # 无需检索，直接生成
+            answer = self.model.generate_answer(query, [])
+
+        # 步骤5: 评估答案可信度
+        support_token = self.model.predict_support_token(
+            query, answer, relevant_docs
+        )
+
+        return {
+            "answer": answer,
+            "retrieve_decision": retrieve_token,
+            "support_level": support_token
+        }
+
+# 使用示例
+model = SelfRAGModel()
+result = model.generate("What is Transformer?")
+
+print(f"答案: {result['answer']}")
+print(f"检索决策: {result['retrieve_decision']}")
+print(f"支撑程度: {result['support_level']}")
+
+# 输出:
+# 答案: Transformer is a deep learning architecture...
+# 检索决策: [Retrieve]
+# 支撑程度: [Fully supported]
+```
+
+**效果提升**:
+- **准确率**: 在PopQA数据集上比标准RAG提升 **7-12%**
+- **成本优化**: 减少不必要的检索调用（成本降低30%）
+- **可解释性**: 反思token提供了决策透明度
 
 ### 6.3 CRAG（纠错性RAG）
 
@@ -645,6 +840,210 @@ graph TB
 6. **查询处理**:
    - **全局查询**: 使用社区摘要直接回答。
    - **局部查询**: 结合图谱路径和向量检索。
+
+#### 7.3.1 Community Detection：Leiden算法详解
+
+**为什么需要社区检测？**
+
+在知识图谱中，实体和关系会形成复杂的网络结构。社区检测的目标是将密切相关的节点划分为**社群（Community）**，每个社群代表一个主题或概念集群。
+
+**示例**：
+```
+文档集: 关于深度学习的100篇论文
+
+构建的知识图谱:
+- 节点: Transformer, BERT, GPT, Attention, RNN, LSTM, CNN...
+- 边: (Transformer, 基于, Attention), (BERT, 使用, Transformer)...
+
+社区检测后:
+社群1: {Transformer, Attention, Multi-Head Attention} → 主题: 注意力机制
+社群2: {BERT, GPT, RoBERTa} → 主题: 预训练语言模型
+社群3: {RNN, LSTM, GRU} → 主题: 循环神经网络
+```
+
+**Leiden算法：优于Louvain的社区检测**
+
+Leiden算法（2019年提出）是GraphRAG中使用的核心算法，它解决了经典Louvain算法的**不连通社区**问题。
+
+**核心原理**：
+
+1. **模块度优化（Modularity Optimization）**
+
+模块度 $Q$ 衡量社区划分的质量：
+$$
+Q = \frac{1}{2m} \sum_{ij} \left[ A_{ij} - \frac{k_i k_j}{2m} \right] \delta(c_i, c_j)
+$$
+
+其中：
+- $A_{ij}$: 节点 $i$ 和 $j$ 之间的边权重
+- $k_i$: 节点 $i$ 的度数
+- $m$: 图中边的总数
+- $\delta(c_i, c_j)$: 节点 $i$ 和 $j$ 是否在同一社区（是为1，否为0）
+
+**目标**: 最大化 $Q$ 值（范围-1到1，越高越好）
+
+2. **Leiden算法的三个阶段**
+
+**阶段1: 局部移动（Local Moving）**
+- 遍历每个节点，尝试将其移动到相邻社区
+- 如果移动能提升模块度，则执行移动
+- 重复直到没有节点可移动
+
+```python
+# 伪代码
+for node in graph.nodes:
+    best_community = node.current_community
+    best_delta_Q = 0
+
+    for neighbor_community in node.neighbor_communities:
+        delta_Q = calculate_modularity_gain(node, neighbor_community)
+        if delta_Q > best_delta_Q:
+            best_community = neighbor_community
+            best_delta_Q = delta_Q
+
+    if best_community != node.current_community:
+        move_node(node, best_community)
+```
+
+**阶段2: 社区精炼（Refinement）**
+- **Leiden的核心创新**：检测社区内的松散连接子集
+- 将不良连接的节点分离，形成新的子社区
+- **解决问题**：Louvain可能产生内部断开的社区
+
+```python
+# 伪代码
+for community in communities:
+    # 检测社区内的连通分量
+    subgraphs = find_connected_components_within(community)
+
+    if len(subgraphs) > 1:
+        # 社区内部不连通，需要分裂
+        for subgraph in subgraphs:
+            # 尝试将子图重新分配到最佳社区
+            best_merge_community = find_best_community_for_subgraph(subgraph)
+            if best_merge_community != community:
+                move_subgraph(subgraph, best_merge_community)
+```
+
+**阶段3: 社区聚合（Aggregation）**
+- 将每个社区压缩为单个"超节点"
+- 社区之间的边权重 = 原始节点之间的边权重总和
+- 在新的聚合图上重复阶段1-2
+
+**3. Leiden vs Louvain 对比**
+
+| 维度 | Louvain算法 | Leiden算法 |
+|-----|-----------|-----------|
+| **连通性** | 可能产生断开的社区 | **保证社区内部连通** |
+| **质量** | 模块度较高 | **模块度更高** |
+| **速度** | 快 | 稍慢（多了精炼步骤） |
+| **层级性** | 支持 | 支持 |
+
+**4. GraphRAG中的应用**
+
+```python
+"""
+使用Leiden算法进行社区检测
+"""
+import networkx as nx
+from cdlib import algorithms
+
+# 1. 构建知识图谱（从LLM提取的三元组）
+G = nx.Graph()
+triplets = [
+    ("Transformer", "proposed_by", "Google"),
+    ("Transformer", "uses", "Self-Attention"),
+    ("BERT", "based_on", "Transformer"),
+    ("GPT", "based_on", "Transformer"),
+    ("Self-Attention", "computes", "Q_K_V"),
+]
+
+for head, relation, tail in triplets:
+    G.add_edge(head, tail, relation=relation)
+
+# 2. 使用Leiden算法检测社区
+communities = algorithms.leiden(G, resolution=1.0)
+
+# 3. 输出社区结果
+print(f"检测到 {len(communities.communities)} 个社区:")
+for i, community in enumerate(communities.communities):
+    print(f"社群 {i+1}: {community}")
+
+# 输出:
+# 检测到 2 个社区:
+# 社群 1: ['Transformer', 'BERT', 'GPT', 'Google']
+# 社群 2: ['Self-Attention', 'Q_K_V']
+
+# 4. 为每个社区生成摘要（使用LLM）
+from openai import OpenAI
+
+client = OpenAI()
+
+for i, community in enumerate(communities.communities):
+    # 提取社区内的所有关系
+    community_edges = [
+        (u, v, G[u][v]['relation'])
+        for u, v in G.edges()
+        if u in community and v in community
+    ]
+
+    # 构建Prompt
+    prompt = f"""
+    根据以下知识图谱片段，生成一个简洁的主题摘要：
+
+    实体: {', '.join(community)}
+    关系: {community_edges}
+
+    摘要（1-2句话）:
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    summary = response.choices[0].message.content
+    print(f"\n社群 {i+1} 摘要:\n{summary}")
+
+# 输出:
+# 社群 1 摘要:
+# 这个社群主要讨论Transformer架构及其衍生模型BERT和GPT，由Google提出。
+
+# 社群 2 摘要:
+# 这个社群关注Self-Attention机制，包括Q、K、V矩阵的计算。
+```
+
+**5. 层级社区检测**
+
+GraphRAG支持**多层级社区检测**，用于处理不同粒度的问题：
+
+```python
+"""
+层级社区检测
+"""
+# 第1层：细粒度社区（10-20个节点/社区）
+level1_communities = algorithms.leiden(G, resolution=1.0)
+
+# 第2层：中等粒度（50-100个节点/社区）
+level2_communities = algorithms.leiden(G, resolution=0.5)
+
+# 第3层：粗粒度（整个图的全局摘要）
+level3_communities = algorithms.leiden(G, resolution=0.1)
+
+# 查询时根据问题类型选择层级:
+# - 细节问题 → 使用 level1
+# - 关联问题 → 使用 level2
+# - 全局总结 → 使用 level3
+```
+
+**6. Leiden算法的优势在GraphRAG中的体现**
+
+| 优势 | 在GraphRAG中的应用 |
+|-----|------------------|
+| **高质量社区** | 更准确的主题聚类，减少跨主题噪音 |
+| **连通性保证** | 社区内的实体确实相关，不会误聚合 |
+| **层级支持** | 支持不同粒度的查询（局部/全局） |
+| **可扩展** | 适用于大规模知识图谱（百万级节点） |
 
 ### 7.4 代码实现（基于LlamaIndex）
 
