@@ -180,6 +180,7 @@ $$
 ```
 
 **关键特点**：
+
 - **单向注意力**：自注意力部分使用因果掩码，只能看到左边
 - **交叉注意力**：通过Cross-Attention连接编码器的输出
 - **自回归生成**：逐个生成token，每次依赖前面已生成的内容
@@ -481,6 +482,7 @@ $$
 如果 $Q = K = X$，意味着**查询方式 = 被匹配方式**，这在语义上是错误的。
 
 **类比**：
+
 ```
 搜索引擎场景：
 - 用户输入（Query）："好吃的川菜"
@@ -502,6 +504,7 @@ $$
 **问题**：$XX^T$ 只能捕获**线性相似度**，无法学习**语义相关性**。
 
 **实验对比**：
+
 | 配置 | 公式 | WikiText-2 困惑度 | 性能 |
 |-----|------|-----------------|------|
 | 无变换（Q=K=V=X） | $\text{softmax}(XX^T)X$ | 65.3 | ❌ 差 |
@@ -546,6 +549,7 @@ K_account = X_account @ W_K  # → [金融特征, 数字相关, ...]
 ```
 
 **关键观察**：
+
 - 相同的输入 $X$
 - 不同的 $W^Q$、$W^K$ 学习到**不同的语义视角**
 - 使得"bank"能根据上下文匹配不同的词
@@ -587,6 +591,7 @@ $$
 - V可以学习具体的"信息内容"特征
 
 **实验验证**（BERT预训练）：
+
 | 配置 | GLUE平均分 | SQuAD F1 |
 |-----|-----------|---------|
 | V=K（共享） | 78.3 | 86.2 |
@@ -2763,8 +2768,9 @@ print(f"  8头: min(n, 8×平均秩) ≈ min(128, 8×50) = 128")
 3. **实证验证**：移除多头导致性能显著下降（BLEU -2.5分）
 
 **面试高频问题**：
+
 - Q: "为什么Transformer需要Multi-Head Attention？"
-- A: "Softmax操作导致单头注意力矩阵天然低秩（rank ≤ min(n-1, d_k)），无法同时捕获多种语言模式。Multi-Head通过在不同子空间学习，恢复了接近满秩的表达能力，从数学上解决了信息瓶颈。"
+- A: "Softmax操作导致单头注意力矩阵天然低秩（rank ≤ min(n-1, $d_k$)），无法同时捕获多种语言模式。Multi-Head通过在不同子空间学习，恢复了接近满秩的表达能力，从数学上解决了信息瓶颈。"
 
 ---
 
@@ -3511,7 +3517,6 @@ $$
 #### BatchNorm vs LayerNorm：数学对比
 
 **Batch Normalization（批归一化）**：
-
 $$
 \text{BatchNorm}(x) = \gamma \frac{x - \mu_B}{\sqrt{\sigma_B^2 + \epsilon}} + \beta
 $$
@@ -4127,6 +4132,7 @@ print(f"\n加速比: {time_no_cache / time_with_cache:.2f}x")
 ```
 
 **预期输出**：
+
 ```
 不使用KV缓存:
   生成文本: Once upon a time, there was a little girl named Lucy who lived in a small village.
@@ -4610,10 +4616,9 @@ scheduler = get_linear_schedule_with_warmup(
 
 ---
 
-#### 原因1：Adam优化器的二阶矩估计初始化偏差
+##### 原因1：Adam优化器的二阶矩估计初始化偏差
 
 **Adam优化器的更新公式**：
-
 $$
 \begin{align}
 m_t &= \beta_1 m_{t-1} + (1-\beta_1) g_t \quad \text{(一阶矩，动量)} \\
@@ -4666,7 +4671,7 @@ Step 4000: lr = 1e-3 * 1 = 1e-3  ← v_t已稳定，可用正常学习率
 
 ---
 
-#### 原因2：Transformer层级梯度范数差异
+##### 原因2：Transformer层级梯度范数差异
 
 **Transformer的独特问题**：不同层的梯度范数差异巨大
 
@@ -4707,7 +4712,7 @@ Step 4000: lr = 1e-3 * 1 = 1e-3  ← v_t已稳定，可用正常学习率
 
 ---
 
-#### 原因3：Attention Softmax饱和问题
+##### 原因3：Attention Softmax饱和问题
 
 **Attention的Softmax**：
 
@@ -4765,7 +4770,7 @@ $$
 
 **常见疑问**：SGD在CV领域很成功，为什么Transformer不用？
 
-#### 原因1：稀疏梯度问题——SGD的致命弱点
+##### 原因1：稀疏梯度问题——SGD的致命弱点
 
 **NLP的独特性**：
 - 词表大（50K-100K个token）
@@ -4840,7 +4845,7 @@ v_AI 积累慢 → sqrt(v_AI)小 → 实际步长 = lr / sqrt(v_AI) 大  ✅
 
 ---
 
-#### 原因2：二阶矩梯度缩放——解决层级尺度问题
+##### 原因2：二阶矩梯度缩放——解决层级尺度问题
 
 **Transformer的层级差异**：
 
@@ -4895,7 +4900,7 @@ Adam（自适应学习率）：
 
 ---
 
-#### 原因3：AdamW的权重衰减解耦——更好的正则化
+##### 原因3：AdamW的权重衰减解耦——更好的正则化
 
 **传统Adam的L2正则化问题**：
 
@@ -4959,7 +4964,7 @@ v_t = β2 * v_{t-1} + (1-β2) * grad_data^2
 
 #### （3）Warmup策略对比与选择
 
-#### 策略1：线性Warmup（最常用）
+##### 策略1：线性Warmup（最常用）
 
 $$
 \text{lr}_t = \begin{cases}
@@ -4991,7 +4996,7 @@ Step 4001+: lr = lr_max（保持不变）
 
 ---
 
-#### 策略2：Inverse Sqrt Warmup（原始Transformer论文）
+##### 策略2：Inverse Sqrt Warmup（原始Transformer论文）
 
 $$
 \text{lr}_t = d_{\text{model}}^{-0.5} \cdot \min\left(t^{-0.5}, t \cdot T_{\text{warmup}}^{-1.5}\right)
@@ -5024,7 +5029,7 @@ Step 64000: lr = lr_max * sqrt(4000/64000) = 0.25 * lr_max
 
 ---
 
-#### 策略3：Cosine Warmup（现代推荐）
+##### 策略3：Cosine Warmup（现代推荐）
 
 $$
 \text{lr}_t = \text{lr}_{\min} + \frac{1}{2}(\text{lr}_{\max} - \text{lr}_{\min}) \left(1 + \cos\left(\frac{t - T_{\text{warmup}}}{T_{\max} - T_{\text{warmup}}} \pi\right)\right)
@@ -5059,7 +5064,7 @@ Step 100000: lr ≈ 0  ← 平滑降至0
 
 ---
 
-#### 策略对比总结
+##### 策略对比总结
 
 | 策略 | Warmup后学习率 | 优势 | 劣势 | 适用场景 |
 |-----|--------------|------|------|---------|
@@ -5135,7 +5140,7 @@ Step 100000: loss=0.5234, lr=5.00e-08  ← 训练结束（lr接近0）
 
 #### （5）面试高频问题
 
-#### Q1：为什么Transformer训练必须用Warmup，而CNN不需要？
+##### Q1：为什么Transformer训练必须用Warmup，而CNN不需要？
 
 **标准回答**：
 1. **Adam二阶矩初始化偏差**：
@@ -5160,7 +5165,7 @@ Step 100000: loss=0.5234, lr=5.00e-08  ← 训练结束（lr接近0）
 
 ---
 
-#### Q2：Warmup步数如何设置？
+##### Q2：Warmup步数如何设置？
 
 **经验规则**：
 - **小模型**（<1B参数）：总步数的 **5-10%**
@@ -5182,7 +5187,7 @@ warmup_steps = int(total_steps * warmup_ratio)
 
 ---
 
-#### Q3：为什么AdamW比Adam更好？
+##### Q3：为什么AdamW比Adam更好？
 
 **标准回答**：
 1. **权重衰减解耦**：
@@ -5200,7 +5205,7 @@ warmup_steps = int(total_steps * warmup_ratio)
 
 ---
 
-#### Q4：SGD能训练Transformer吗？
+##### Q4：SGD能训练Transformer吗？
 
 **标准回答**：
 - 理论上可以，但**极其困难**且**效果差**
@@ -5223,7 +5228,7 @@ warmup_steps = int(total_steps * warmup_ratio)
 
 ---
 
-#### Q5：能否不用Warmup？
+##### Q5：能否不用Warmup？
 
 **标准回答**：
 - **可以但不推荐**，需要：
@@ -5263,10 +5268,6 @@ warmup_steps = int(total_steps * warmup_ratio)
    - **公式**：AdamW更新公式（含解耦权重衰减）
    - **数据**：AdamW vs Adam +2.4%、SGD vs Adam困惑度45.3 vs 18.5
    - **概念**：稀疏梯度、自适应学习率、权重衰减解耦、二阶矩偏差
-
----
-
-**补充完成！请将此内容插入第1章问题5之后、问题6之前（line 4359）**
 
 ---
 
@@ -5696,30 +5697,7 @@ $$
 - 视频：斯坦福CS224N Lecture on Transformers
 
 **推荐实践**：
+
 - 从零实现一个完整的Transformer编码器
 - 可视化不同层、不同头的注意力模式
 - 对比MHA、GQA、MQA在实际模型上的性能
-
----
-
-## 参考文献
-
-[1] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). **Attention is all you need**. *Advances in Neural Information Processing Systems*, 30.
-
-[2] Su, J., Lu, Y., Pan, S., Murtadha, A., Wen, B., & Liu, Y. (2021). **RoFormer: Enhanced transformer with rotary position embedding**. *arXiv preprint arXiv:2104.09864*.
-
-[3] Ainslie, J., Lee-Thorp, J., de Jong, M., Zemlyanskiy, Y., Lebrón, F., & Sanghai, S. (2023). **GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints**. *arXiv preprint arXiv:2305.13245*.
-
-[4] Shazeer, N. (2019). **Fast transformer decoding: One write-head is all you need**. *arXiv preprint arXiv:1911.02150*. (Multi-Query Attention)
-
-[5] Press, O., Smith, N. A., & Lewis, M. (2021). **Train short, test long: Attention with linear biases enables input length extrapolation**. *arXiv preprint arXiv:2108.12409*. (ALiBi)
-
-[6] Dao, T., Fu, D. Y., Ermon, S., Rudra, A., & Ré, C. (2022). **FlashAttention: Fast and memory-efficient exact attention with IO-awareness**. *Advances in Neural Information Processing Systems*, 35.
-
-[7] Xiong, R., Yang, Y., He, D., Zheng, K., Zheng, S., Xing, C., ... & Liu, T. (2020). **On layer normalization in the transformer architecture**. *International Conference on Machine Learning*, PMLR.
-
----
-
-> **章节状态**：✅ 已完成
-> **最后更新**：2026-01
-> **代码兼容**：PyTorch 2.0+, Transformers 4.36+
