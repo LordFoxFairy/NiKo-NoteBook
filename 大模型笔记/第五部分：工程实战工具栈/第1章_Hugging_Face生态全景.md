@@ -1,39 +1,44 @@
-# 第1章：Hugging Face生态全景
+# 第1章：Hugging Face 生态全景 (The Complete Guide)
 
-> **本章定位**：不再赘述原理，直接进入代码实战。掌握 `Transformers`, `Datasets`, `Accelerate` 的核心工程能力。
+> **本章定位**：这是构建 LLM 应用的基石。我们将深入 Hugging Face 生态的五大核心组件：`Transformers`, `Datasets`, `Tokenizers`, `Accelerate`, `Hub`。不仅覆盖基础 API，更包含**量化加载**、**词表扩充**、**断点续训**、**分布式配置**等工业级实战技巧。
 
 ---
 
 ## 目录
-- [1. High-Level API: Pipeline 与 AutoClass](#1-high-level-api-pipeline-与-autoclass)
-  - [1.1 极速推理：Pipeline](#11-极速推理pipeline)
-  - [1.2 灵活调用：AutoClass](#12-灵活调用autoclass)
-- [2. Datasets: 数据处理工具链](#2-datasets-数据处理工具链)
-  - [2.1 流式加载大规模数据](#21-流式加载大规模数据)
-  - [2.2 高效预处理：Map 与 Filter](#22-高效预处理map-与-filter)
-- [3. Accelerate: 分布式训练入门](#3-accelerate-分布式训练入门)
-  - [3.1 混合精度训练](#31-混合精度训练)
-  - [3.2 多卡训练](#32-多卡训练)
-- [4. Model Hub: 模型版本管理](#4-model-hub-模型版本管理)
-  - [4.1 上传模型](#41-上传模型)
-  - [4.2 模型卡片编写](#42-模型卡片编写)
-- [5. Tokenizers: 自定义分词器训练](#5-tokenizers-自定义分词器训练)
-- [本章小结](#本章小结)
+
+- [1. Transformers：模型加载与推理](#1-transformers模型加载与推理)
+  - [1.1 Pipeline：极速验证](#11-pipeline极速验证)
+  - [1.2 AutoClass：底层控制与 Flash Attention](#12-autoclass底层控制与-flash-attention)
+  - [1.3 Quantization：4-bit/8-bit 量化加载](#13-quantization4-bit8-bit-量化加载)
+- [2. Datasets：海量数据工程](#2-datasets海量数据工程)
+  - [2.1 流式加载 (Streaming) 与 混合 (Interleave)](#21-流式加载-streaming-与-混合-interleave)
+  - [2.2 并行处理 (Map) 与 数据分片 (Sharding)](#22-并行处理-map-与-数据分片-sharding)
+  - [2.3 自定义数据集加载脚本](#23-自定义数据集加载脚本)
+- [3. Tokenizers：分词器的艺术与陷阱](#3-tokenizers分词器的艺术与陷阱)
+  - [3.1 Chat Template 原理：如何避免"答非所问"](#31-chat-template-原理如何避免答非所问)
+  - [3.2 Padding Side：左补齐 vs 右补齐](#32-padding-side左补齐-vs-右补齐)
+  - [3.3 实战：扩充中文词表 (Add Tokens)](#33-实战扩充中文词表-add-tokens)
+- [4. Training：训练与分布式](#4-training训练与分布式)
+  - [4.1 Trainer API：Callbacks 与 断点续训](#41-trainer-api-callbacks-与-断点续训)
+  - [4.2 Accelerate + DeepSpeed：分布式配置详解](#42-accelerate--deepspeed分布式配置详解)
+- [5. Hub：模型管理与版本控制](#5-hub模型管理与版本控制)
+  - [5.1 模型上传与 Revision 锁定](#51-模型上传与-revision-锁定)
+  - [5.2 Model Card 编写规范](#52-model-card-编写规范)
+- [本章小结：开发流 CheckList](#本章小结开发流-checklist)
 
 ---
 
-## 1. High-Level API: Pipeline 与 AutoClass
+## 1. Transformers：模型加载与推理
 
-最快速的模型调用方式，适合验证模型能力。
+### 1.1 Pipeline：极速验证
 
-### 1.1 极速推理：Pipeline
+适合快速测试模型能力。
 
 ```python
 import torch
 from transformers import pipeline
 
-# 自动处理了：Tokenizer -> Model -> Post-processing
-# device_map="auto" 自动分配显存，支持多卡
+# 自动推断设备，默认使用 bfloat16 (推荐 Ampere 架构 GPU 使用)
 pipe = pipeline(
     "text-generation",
     model="meta-llama/Llama-3-8B-Instruct",
@@ -41,23 +46,24 @@ pipe = pipeline(
     device_map="auto",
 )
 
-# 批处理推理（Batch Inference）大大提升吞吐量
-prompts = [
-    "Explain quantum computing in 50 words.",
-    "Write a haiku about coding.",
-    "Translate 'Hello world' to Python."
-]
-
-# batch_size=4 显存允许时越大越好
-outputs = pipe(prompts, batch_size=4, max_new_tokens=128, temperature=0.7)
-
-for out in outputs:
-    print(f"Generated: {out[0]['generated_text']}\n{'-'*20}")
+# Batch Inference (提升吞吐量的关键)
+prompts = ["Explain AI.", "Write a poem."]
+outputs = pipe(
+    prompts,
+    batch_size=8,
+    max_new_tokens=128,
+    temperature=0.7,
+    do_sample=True
+)
 ```
 
-### 1.2 底层控制：AutoModel & AutoTokenizer
+### 1.2 AutoClass：底层控制与 Flash Attention
 
-当主要逻辑需要定制时（如自定义 Attention mask、特殊解码策略），使用 AutoClass。
+生产环境通常使用 `AutoModel` + `AutoTokenizer`。
+
+**Flash Attention 2 加速**：
+这是现代 LLM 推理/训练的必备加速技术。
+*   **前提**：安装 `flash-attn` 库 (`pip install flash-attn --no-build-isolation`) + 兼容的 GPU (A100, A10, RTX 3090/4090)。
 
 ```python
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -66,246 +72,287 @@ import torch
 model_id = "meta-llama/Llama-3-8B-Instruct"
 
 # 1. 加载 Tokenizer
-# padding_side="left" 对生成式模型很重要，否则生成会受 pad token 干扰
 tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side="left")
-tokenizer.pad_token = tokenizer.eos_token # Llama 系列通常需要手动指定 pad_token
+tokenizer.pad_token = tokenizer.eos_token
 
-# 2. 加载 Model
-# attn_implementation="flash_attention_2" 开启 FlashAttention 加速（需安装 flash-attn 库）
+# 2. 加载 Model (开启 FA2)
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     torch_dtype=torch.bfloat16,
     device_map="auto",
-    attn_implementation="flash_attention_2"
+    attn_implementation="flash_attention_2"  # 关键加速参数
+)
+```
+
+### 1.3 Quantization：4-bit/8-bit 量化加载
+
+在显存有限的设备（如单卡 24G 跑 70B 模型）上，量化是刚需。HF 通过 `bitsandbytes` (bnb) 库实现了原生集成。
+
+**依赖**：`pip install bitsandbytes`
+
+```python
+from transformers import BitsAndBytesConfig
+
+# NF4 (Normal Float 4) 配置：精度损失极小的 4bit 量化
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,  # 计算时还原为 bf16
+    bnb_4bit_use_double_quant=True          # 二次量化，进一步节省显存
 )
 
-# 3. 构造 Chat 模板
-messages = [
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "Hello!"},
-]
-# apply_chat_template 自动处理 <|begin_of_text|>, <|start_header_id|> 等特殊 token
-input_ids = tokenizer.apply_chat_template(
-    messages,
-    add_generation_prompt=True,
-    return_tensors="pt"
-).to(model.device)
-
-# 4. 生成
-outputs = model.generate(
-    input_ids,
-    max_new_tokens=256,
-    eos_token_id=tokenizer.eos_token_id,
-    do_sample=True,
-    temperature=0.6,
-    top_p=0.9,
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=bnb_config,         # 传入量化配置
+    device_map="auto"
 )
 
-response_ids = outputs[0][input_ids.shape[-1]:]
-print(tokenizer.decode(response_ids, skip_special_tokens=True))
+# 显存对比 (Llama-3-8B):
+# fp16: ~16GB
+# 4bit: ~6GB
 ```
 
 ---
 
-## 2. 数据处理：Datasets库的高效操作
+## 2. Datasets：海量数据工程
 
-处理 100GB+ 数据集的核心技巧：**Map**, **Filter**, **Streaming**。
+### 2.1 流式加载 (Streaming) 与 混合 (Interleave)
 
-### 2.1 高效加载与流式处理
+处理 TB 级数据集（如 C4, WanJuan）时，无法全部下载。
 
 ```python
-from datasets import load_dataset
+from datasets import load_dataset, interleave_datasets
 
-# 1. 常规加载（下载并解压到本地缓存）
+# 1. Streaming 模式
+ds_en = load_dataset("c4", "en", split="train", streaming=True)
+ds_zh = load_dataset("wanjuan", "zh", split="train", streaming=True)
+
+# 2. 数据混合 (80% 英文, 20% 中文) -> 预训练常用 trick
+ds_mixed = interleave_datasets([ds_en, ds_zh], probabilities=[0.8, 0.2])
+
+# 3. 迭代查看
+for i, example in enumerate(ds_mixed):
+    print(example['text'][:50])
+    if i == 5: break
+```
+
+### 2.2 并行处理 (Map) 与 数据分片 (Sharding)
+
+**Map 并行化**：
+```python
 ds = load_dataset("imdb", split="train")
 
-# 2. 流式加载（Streaming）：不下载由本地，随用随下，处理 TB 级数据必备
-ds_stream = load_dataset("c4", "en", split="train", streaming=True)
+def process_fn(examples):
+    # 支持 batch 处理
+    return tokenizer(examples["text"], truncation=True, max_length=512)
 
-# 处理流式数据
-top_10_examples = ds_stream.take(10)
-for ex in top_10_examples:
-    print(ex['text'][:50])
-```
-
-### 2.2 Map 与 Filter 实战
-
-```python
-# 假设我们有一个包含 'text' 列的数据集
-def process_data(batch):
-    # 1. 过滤掉过短的文本
-    if len(batch["text"]) < 50:
-        return {"input_ids": []} # 标记为待删除
-
-    # 2. Tokenize
-    tokenized = tokenizer(
-        batch["text"],
-        truncation=True,
-        max_length=512,
-        padding=False # 训练时通常在 DataCollator 中动态 Padding，节省显存
-    )
-    return tokenized
-
-# batched=True + num_proc 多进程并行处理，速度提升 10x
-# remove_columns 删除原始文本列，减少内存占用
-processed_ds = ds.map(
-    process_data,
+tokenized_ds = ds.map(
+    process_fn,
     batched=True,
     batch_size=1000,
-    num_proc=8, # 根据 CPU 核数设置
-    remove_columns=ds.column_names,
-    desc="Tokenizing dataset"
+    num_proc=8,        # 多进程加速
+    remove_columns=ds.column_names # 移除原始文本列，节省 RAM
 )
+```
 
-# 真正的过滤（map 中只是处理，过滤需用 filter）
-filtered_ds = processed_ds.filter(lambda x: len(x["input_ids"]) > 0)
+**Sharding (分片)**：
+分布式训练时，需要把大数据集切分成小块分发给不同节点。
+```python
+# 将数据集切分为 100 份，取第 0 份
+shard_0 = ds.shard(num_shards=100, index=0)
+```
+
+### 2.3 自定义数据集加载脚本
+
+当数据格式复杂（如 JSONL 嵌套、特殊 CSV），或者是私有数据时，编写加载脚本比手动解析更高效。
+
+创建 `my_dataset.py`:
+```python
+import datasets
+
+class MyDataset(datasets.GeneratorBasedBuilder):
+    def _info(self):
+        return datasets.DatasetInfo(
+            features=datasets.Features({
+                "text": datasets.Value("string"),
+                "label": datasets.Value("int32"),
+            })
+        )
+
+    def _split_generators(self, dl_manager):
+        return [
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": "train.jsonl"}),
+        ]
+
+    def _generate_examples(self, filepath):
+        with open(filepath, encoding="utf-8") as f:
+            for id_, line in enumerate(f):
+                # 自定义解析逻辑
+                yield id_, json.loads(line)
+```
+
+使用：
+```python
+ds = load_dataset("./my_dataset.py")
 ```
 
 ---
 
-## 3. 分布式利器：Accelerate
+## 3. Tokenizers：分词器的艺术与陷阱
 
-在不使用 Trainer 的情况下，如何用几行代码将 PyTorch 代码迁移到多卡/TPU？
+### 3.1 Chat Template 的原理与陷阱
 
-### 3.1 改造 PyTorch 训练循环
+微调后的 Chat 模型（Llama-3, Qwen-2）对 Prompt 格式极其敏感。少一个空格或换行都可能导致模型“变傻”。
+
+**原理**：Tokenizer 配置中的 `chat_template` 字段定义了 Jinja2 模板。
 
 ```python
-from accelerate import Accelerator
-import torch
+chat = [
+    {"role": "user", "content": "Hello"},
+    {"role": "assistant", "content": "Hi there!"}
+]
 
-# 1. 初始化 Accelerator
-# mixed_precision="fp16" 自动处理混合精度
-accelerator = Accelerator(mixed_precision="fp16")
-
-model = MyModel()
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-train_loader = ...
-
-# 2. 准备对象 (Prepare)
-# Accelerator 会自动将模型转为 DDP 模式，将数据分片到各 GPU
-model, optimizer, train_loader = accelerator.prepare(
-    model, optimizer, train_loader
-)
-
-model.train()
-for batch in train_loader:
-    optimizer.zero_grad()
-    outputs = model(**batch)
-    loss = outputs.loss
-
-    # 3. 替换 loss.backward()
-    accelerator.backward(loss)
-
-    optimizer.step()
-
-# 4. 保存模型 (只在主进程保存)
-# accelerator.wait_for_everyone() 同步所有进程
-accelerator.wait_for_everyone()
-unwrapped_model = accelerator.unwrap_model(model)
-if accelerator.is_main_process:
-    torch.save(unwrapped_model.state_dict(), "model.pt")
+# 自动渲染 (推荐)
+text = tokenizer.apply_chat_template(chat, tokenize=False)
+print(text)
+# Llama-3 输出: <|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\nHello<|eot_id|>...
 ```
 
-### 3.2 启动命令
+**陷阱**：
+如果手动拼接字符串（如 `f"User: {msg}"`），不仅格式可能错，还会导致特殊 Token（如 `<|eot_id|>`）被当作普通文本编码，模型无法识别停止信号。
 
-不需要修改代码中的 `device`，直接通过 CLI 启动：
+### 3.2 Padding Side：左补齐 vs 右补齐
 
-```bash
-# 配置环境（只需运行一次）
-accelerate config
+| 场景 | Padding Side | 原因 |
+|---|---|---|
+| **训练 (Training)** | `right` | 配合 Attention Mask，通常在序列末尾补齐效率最高。 |
+| **推理 (Generation)** | `left` | **必须向左补齐！** 因为生成是自回归的，如果右侧有 Pad，模型会根据 Pad 去预测下一个词，导致输出乱码。 |
 
-# 启动训练（自动适配单机多卡、多机多卡）
-accelerate launch train.py
+```python
+tokenizer.padding_side = "left"  # 推理时务必设置
+```
+
+### 3.3 实战：扩充中文词表 (Add Tokens)
+
+Llama-3 原生词表对中文支持一般（一个汉字可能被切成 3 个 token）。微调时常需扩充词表。
+
+```python
+# 1. 添加新词
+new_tokens = ["你好", "人工智能", "大模型"]
+num_added = tokenizer.add_tokens(new_tokens)
+
+# 2. 调整模型 Embedding 层大小 (这也是必须要做的！)
+# 模型原本 vocab_size 是 128256，现在变大了，Embedding 矩阵也要变大
+model.resize_token_embeddings(len(tokenizer))
+
+print(f"Added {num_added} tokens. New vocab size: {len(tokenizer)}")
+
+# 注意：新加入的 Token 初始 Embedding 是随机的，需要经过 Fine-tuning 才能有语义。
 ```
 
 ---
 
-## 4. Trainer API：工业级训练封装
+## 4. Training：训练与分布式
 
-Hugging Face `Trainer` 封装了 logging, gradient accumulation, checkpointing, distributed training 等复杂逻辑。
+### 4.1 Trainer API：Callbacks 与 断点续训
 
-### 4.1 核心配置与自定义 Loss
+`Trainer` 是 HF 生态的核心训练器。
 
-```python
-from transformers import Trainer, TrainingArguments
-
-class CustomTrainer(Trainer):
-    """
-    继承 Trainer 以自定义 Loss 计算逻辑
-    """
-    def compute_loss(self, model, inputs, return_outputs=False):
-        labels = inputs.get("labels")
-        # 前向传播
-        outputs = model(**inputs)
-        logits = outputs.get("logits")
-
-        # 自定义加权 Loss：给予后半段文本更高权重（示例）
-        # 标准是 CrossEntropyLoss
-        loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = labels[..., 1:].contiguous()
-
-        loss = loss_fct(shift_logits.view(-1, self.model.config.vocab_size), shift_labels.view(-1))
-
-        # 简单平均
-        loss = loss.mean()
-
-        return (loss, outputs) if return_outputs else loss
-
-# 训练参数配置（最佳实践）
-args = TrainingArguments(
-    output_dir="./results",
-    num_train_epochs=3,
-    per_device_train_batch_size=8, # 单卡 batch size
-    gradient_accumulation_steps=4, # 梯度累积，等效 batch_size = 8 * 4 * num_gpus
-    learning_rate=2e-5,
-    weight_decay=0.01,
-    bf16=True,                     # A100/H100 必开，3090/4090 可开
-    logging_steps=10,
-    save_strategy="steps",
-    save_steps=500,
-    evaluation_strategy="steps",
-    eval_steps=500,
-    save_total_limit=3,            # 只保留最新的3个checkpoint
-    report_to="wandb",             # 实验记录
-    dataloader_num_workers=4,      # 数据加载进程数
-    gradient_checkpointing=True,   # 显存优化：以计算换显存
-)
-
-trainer = CustomTrainer(
-    model=model,
-    args=args,
-    train_dataset=train_dataset,
-    eval_dataset=eval_dataset,
-    tokenizer=tokenizer,
-)
-
-trainer.train()
-```
-
-### 4.2 Callback 机制
-
-在训练过程中插入自定义逻辑（如：每生成 100 步打印一次生成结果）。
-
+**WandB 集成与 Callbacks**：
 ```python
 from transformers import TrainerCallback
 
-class GenerationCallback(TrainerCallback):
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        # 这里的 step 检查逻辑
-        if state.global_step % args.logging_steps == 0:
-            print(f"Step {state.global_step}: Logging stats...")
+class LogCallback(TrainerCallback):
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step % 10 == 0:
+            print(f"Step {state.global_step} finished.")
 
-trainer.add_callback(GenerationCallback())
+# 配置参数
+args = TrainingArguments(
+    output_dir="./checkpoints",
+    report_to="wandb",  # 自动集成 Weights & Biases
+    run_name="llama3-finetune-v1",
+    save_strategy="steps",
+    save_steps=500,
+    load_best_model_at_end=True, # 训练结束加载验证集最好的模型
+)
+```
+
+**断点续训 (Resume Training)**：
+训练大模型动辄几天，中断是常态。
+```python
+trainer.train(resume_from_checkpoint=True)
+# 或者指定具体路径
+# trainer.train(resume_from_checkpoint="./checkpoints/checkpoint-5000")
+```
+
+### 4.2 Accelerate + DeepSpeed：分布式配置详解
+
+不使用 Trainer 时，Accelerate 是手动写训练循环的最佳伴侣。它完美集成了 DeepSpeed。
+
+**配置 DeepSpeed**：
+运行 `accelerate config`，选择 DeepSpeed，然后选择 ZeRO Stage (0/1/2/3)。
+
+*   **ZeRO-2**：切分优化器状态 + 梯度（及格线，适合单机多卡）。
+*   **ZeRO-3**：切分模型参数（显存占用最小，适合超大模型）。
+*   **Offload**：将参数卸载到 CPU 内存（速度慢，但能跑更大的模型）。
+
+**代码集成**：
+```python
+from accelerate import Accelerator
+
+# 初始化时会自动读取 accelerate config 的配置
+accelerator = Accelerator()
+
+# 准备
+model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+    model, optimizer, train_dataloader, lr_scheduler
+)
+
+# 训练步
+accelerator.backward(loss) # 替代 loss.backward()
 ```
 
 ---
 
-## 5. 本章小结：开发流选择指引
+## 5. Hub：模型管理与版本控制
 
-| 场景 | 推荐工具 | 理由 |
-| :--- | :--- | :--- |
-| **快速验证 / Demo** | `Pipeline` | 代码最少，开箱即用。 |
-| **标准微调 (SFT/LoRA)** | `Trainer` | 内置了所有最佳实践，配合 TRL 库更佳。 |
-| **修改模型架构 / 复杂循环** | `Accelerate` | 保持 PyTorch 的灵活性，同时获得分布式能力。 |
-| **极端定制 / 纯 PyTorch** | 原生 DDP | 仅在需要完全控制所有底层细节时使用。 |
+### 5.1 模型上传与 Revision 锁定
+
+不要只 push 到 `main`。
+
+```python
+# 上传时打标签
+model.push_to_hub("my-model", revision="v1.0")
+
+# 加载时锁定版本 (生产环境铁律)
+model = AutoModel.from_pretrained(
+    "username/my-model",
+    revision="d4e5f6...", # Commit Hash 或 Tag
+    trust_remote_code=True
+)
+```
+
+### 5.2 Model Card 编写规范
+
+一个好的 `README.md` (Model Card) 应包含：
+1.  **Model Details**: 基础架构、参数量、训练数据来源。
+2.  **Usage**: 几行可运行的 Python 代码示例。
+3.  **Evaluation**: 在 MTEB 或 OpenCompass 上的评测分数。
+4.  **Bias & Limitations**: 模型的局限性和偏见声明。
+
+---
+
+## 本章小结：开发流 CheckList
+
+在开始下一章（微调实战）之前，请自查是否掌握了以下 **Engineering** 细节：
+
+1.  ✅ **推理加速**：是否开启了 `Flash Attention 2` 和 `bfloat16`？
+2.  ✅ **显存优化**：是否会用 `bitsandbytes` 进行 4-bit 量化加载？
+3.  ✅ **数据处理**：面对 TB 级数据，是否会用 `Streaming` 和 `Interleave`？
+4.  ✅ **分词避坑**：推理时是否将 padding 设为了 `left`？是否使用了正确的 `Chat Template`？
+5.  ✅ **训练稳健性**：是否配置了 `save_limit` 防止硬盘撑爆？是否知道如何 `resume_from_checkpoint`？
+
+掌握了这些，你就不再是 API 调包侠，而是具备了 **LLM 工程化落地** 的能力。
+
+下一章，我们将介绍 **LLaMA-Factory**——它将上述所有（Trainer, DeepSpeed, Quantization, FlashAttn）封装成了一个 WebUI 界面，让你体验“零代码微调”的快感。

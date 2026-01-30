@@ -223,7 +223,7 @@ accelerate launch --use_deepspeed --zero_stage 2 train.py
 
 ---
 
-## 4. 2025年视角：DeepSpeed vs FSDP
+## 4. 深度对比：DeepSpeed vs FSDP
 
 PyTorch 原生的 **FSDP (Fully Sharded Data Parallel)** 已经变得非常成熟。
 
@@ -258,7 +258,49 @@ $ accelerate config
 
 ---
 
-## 5. 本章小结
+## 5. 多节点训练 (Multi-Node)
+
+当单机 8 卡也无法满足需求时（如微调 Llama-3-70B），我们需要跨机器并行。
+
+### 5.1 DeepSpeed Hostfile 模式（推荐）
+
+这是最简单的方式，无需复杂的 `torchrun` 参数。
+
+**Step 1: 准备 Hostfile**
+创建 `/job/hostfile`，列出所有机器的 IP 和 GPU 数量：
+```text
+192.168.1.100 slots=8
+192.168.1.101 slots=8
+```
+
+**Step 2: 启动命令**
+在 Master 节点（第一台机器）运行：
+```bash
+deepspeed --hostfile /job/hostfile \
+    --master_port 29500 \
+    train.py --deepspeed ds_config.json
+```
+
+**Step 3: SSH 免密互信 (关键)**
+确保 Master 节点能通过 SSH 免密登录到 Worker 节点，否则 DeepSpeed 无法启动远程进程。
+
+### 5.2 Accelerate 多机模式
+
+如果使用 HF Trainer，推荐用 `accelerate config` 生成配置。
+
+```yaml
+compute_environment: LOCAL_MACHINE
+distributed_type: DEEPSPEED
+machine_rank: 0  # 在不同机器上设为 0, 1...
+main_process_ip: 192.168.1.100
+main_process_port: 29500
+num_machines: 2
+num_processes: 16
+```
+
+---
+
+## 6. 本章小结
 
 1. **ZeRO-2**: 目前性价比最高的选择。适合多卡微调。
 2. **ZeRO-3**: 大模型（>13B）全量微调必备。如果爆显存，开启 `offload_optimizer: cpu`。

@@ -42,7 +42,7 @@
 
 ## 一、从 Prompt Engineering 到 Agentic Workflow
 
-Andrew Ng 在 2024 年提出一个重要观点:**与其追求更强的模型 (GPT-5),不如优化 Agent 工作流 (Agentic Workflow)**。
+Andrew Ng 最近提出一个重要观点:**与其追求更强的模型 (GPT-5),不如优化 Agent 工作流 (Agentic Workflow)**。
 GPT-3.5 + 良好的工作流,往往能超越零样本的 GPT-4。
 
 ### 1. 什么是 Agentic Workflow?
@@ -1116,7 +1116,7 @@ Assistant: {item['assistant']}
 
 ## 六、LangGraph:状态机编程范式
 
-LangGraph 是 2024/2025 年构建 Agent 的核心框架,由 LangChain 团队开发。
+LangGraph 是当前构建 Agent 的核心框架,由 LangChain 团队开发。
 
 ### 1. StateGraph 核心概念
 

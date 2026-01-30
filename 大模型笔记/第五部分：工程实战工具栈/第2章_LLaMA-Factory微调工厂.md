@@ -1,243 +1,306 @@
-# 第2章：LLaMA-Factory微调工厂
+# 第2章：LLaMA-Factory 微调工厂
 
-> **本章定位**：零代码/低代码微调神器。重点掌握 **配置文件的编写** 和 **WebUI 的操作流**。
+> **项目地址**：[https://github.com/hiyouga/LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
+>
+> **本章定位**：从手写 PyTorch 进阶到“流水线工厂”。学会利用 LLaMA-Factory 进行零代码（WebUI）和低代码（CLI）的高效微调，涵盖从 SFT 到模型导出（Merge）的全流程。
 
 ---
 
 ## 目录
+
 - [1. 为什么选择 LLaMA-Factory？](#1-为什么选择-llama-factory)
-- [2. 核心：YAML 配置文件详解](#2-核心yaml-配置文件详解)
-- [3. Web UI 零代码微调](#3-web-ui-零代码微调)
-- [4. 数据集配置管理](#4-数据集配置管理)
-- [5. 高级用法](#5-高级用法)
+- [2. 环境搭建与 Unsloth 加速](#2-环境搭建与-unsloth-加速)
+  - [2.1 标准安装](#21-标准安装)
+  - [2.2 开启 Unsloth 极速模式（推荐）](#22-开启-unsloth-极速模式推荐)
+- [3. 数据工程：Dataset Registration](#3-数据工程dataset-registration)
+  - [3.1 数据格式标准 (Alpaca vs ShareGPT)](#31-数据格式标准-alpaca-vs-sharegpt)
+  - [3.2 注册自定义数据集 (`dataset_info.json`)](#32-注册自定义数据集-dataset_infojson)
+- [4. 可视化微调：WebUI 全流程](#4-可视化微调webui-全流程)
+  - [4.1 启动与界面概览](#41-启动与界面概览)
+  - [4.2 训练参数配置详解](#42-训练参数配置详解)
+  - [4.3 训练监控与评估](#43-训练监控与评估)
+- [5. 生产化：从 WebUI 到 CLI 自动化](#5-生产化从-webui-到-cli-自动化)
+  - [5.1 导出 YAML 配置文件](#51-导出-yaml-配置文件)
+  - [5.2 命令行启动训练](#52-命令行启动训练)
+  - [5.3 多机多卡分布式配置](#53-多机多卡分布式配置)
+- [6. 模型导出与合并](#6-模型导出与合并)
 - [本章小结](#本章小结)
 
 ---
 
 ## 1. 为什么选择 LLaMA-Factory？
 
-LLaMA-Factory 实际上是一套基于 Transformers 和 PEFT 的**高级封装**。它解决了以下痛点：
-1. **模板对齐**：自动处理 ChatML, Alpaca, Llama2, Llama3 等各种繁杂的 Prompt Template。
-2. **环境适配**：一键开启 FlashAttention-2, Unsloth (加速训练), DeepSpeed。
-3. **算法集成**：集成了 LoRA, QLoRA, GaLore, DoRA 等最新微调技术。
+在 LLaMA-Factory 出现之前，微调一个模型需要自己手写 PEFT 代码、处理复杂的 Padding、适配 Flash Attention。LLaMA-Factory 解决了以下**核心痛点**：
+
+1.  **多模型适配**：一套代码支持 Llama-3, Qwen-2, Mistral, Gemma 等 100+ 模型。
+2.  **多算法集成**：无缝切换 Full, LoRA, QLoRA, DoRA, PPO, DPO。
+3.  **多硬件兼容**：自动适配 DeepSpeed (ZeRO), Unsloth (Triton优化), FlashAttention-2。
+4.  **零代码门槛**：提供 WebUI 界面，小白也能点点鼠标跑通微调。
 
 ---
 
-## 2. 核心：YAML 配置文件详解
+## 2. 环境搭建与 Unsloth 加速
 
-在 CLI 模式下，我们通过编写 `yaml` 文件来控制训练。这是生产环境中最常用的方式。
+### 2.1 标准安装
 
-### 2.1 配置文件结构 (`examples/train_lora.yaml`)
-
-```yaml
-# --- 模型参数 ---
-model_name_or_path: meta-llama/Llama-3-8B-Instruct  # 基座模型路径
-trust_remote_code: true
-
-# --- 方法参数 ---
-stage: sft                     # 训练阶段: sft, pt(预训练), rm(奖励模型), ppo, dpo
-do_train: true
-finetuning_type: lora          # 微调方式: lora, full, freeze
-lora_target: all               # LoRA 挂载目标: all (推荐), q_proj,v_proj 等
-lora_rank: 16                  # LoRA 秩: 8, 16, 32, 64
-lora_alpha: 16                 # LoRA 缩放系数: 通常 = rank 或 rank * 2
-lora_dropout: 0.05
-
-# --- 数据参数 ---
-dataset: identity,alpaca_en    # 数据集名称，需在 dataset_info.json 中注册
-template: llama3               # 对应的 Prompt 模板，这步非常关键！
-cutoff_len: 1024               # 截断长度
-overwrite_cache: true
-preprocessing_num_workers: 16
-
-# --- 训练参数 ---
-output_dir: saves/llama3-8b/lora/sft  # 输出目录
-logging_steps: 10
-save_steps: 100
-plot_loss: true
-overwrite_output_dir: true
-
-# --- 显存与优化配置 ---
-per_device_train_batch_size: 2
-gradient_accumulation_steps: 4 # 累积梯度，显存不够时调大这个，调小 batch_size
-learning_rate: 5.0e-5
-num_train_epochs: 3.0
-lr_scheduler_type: cosine
-warmup_ratio: 0.1
-fp16: true                     # 开启混合精度
-# bf16: true                   # 如果是 A100/H100 建议开启 bf16
-
-# --- 高级优化 ---
-# flash_attn: fa2              # 显式开启 FlashAttention-2
-# quantization_bit: 4          # 开启 QLoRA 4bit 量化（极大节省显存）
-```
-
-### 2.2 启动命令
-
-编写好 `custom_sft.yaml` 后，一行命令启动：
+推荐使用 PyTorch 2.4+ 和 CUDA 12.1+ 环境。
 
 ```bash
-llamafactory-cli train custom_sft.yaml
+# 1. 克隆仓库
+git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git
+cd LLaMA-Factory
+
+# 2. 安装依赖 (推荐先创建 conda 环境)
+# [metrics] 用于评估，[bitsandbytes] 用于量化
+pip install -e ".[torch,metrics,bitsandbytes]"
 ```
 
-### 2.3 参数详解：核心配置说明
+### 2.2 开启 Unsloth 极速模式（推荐）
 
-#### `lora_target` - LoRA 挂载目标
+**Unsloth** 是当前最强的微调加速库，通过重写 Triton 内核，能实现：
+- 训练速度提升 **2-5 倍**
+- 显存占用减少 **60%** (单张 T4/4060 也能跑 Llama-3-8B)
 
-决定 LoRA 权重挂载到模型的哪些层：
+安装 Unsloth (需根据 CUDA 版本选择，以下以 CUDA 12.1 为例)：
 
-```yaml
-lora_target: all  # 推荐：自动检测并挂载所有线性层
-# 或手动指定：
-# lora_target: q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj
-```
-
-**选择策略**：
-- `all`：最佳效果，训练所有 Attention + FFN 层（推荐）
-- `q_proj,v_proj`：最快速度，只训练 Attention 的 Query/Value 投影
-- `q_proj,v_proj,k_proj,o_proj`：平衡方案，训练完整 Attention 层
-
-#### `template` - Prompt 模板
-
-必须与模型的训练格式对齐，否则会导致效果崩溃：
-
-| 模型 | Template 值 | 示例格式 |
-|------|------------|----------|
-| Llama-3 | `llama3` | `<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{user_msg}<|eot_id|>` |
-| Qwen2 | `qwen` | `<|im_start|>user\n{user_msg}<|im_end|>\n<|im_start|>assistant\n` |
-| ChatGLM3 | `chatglm3` | `<|user|>\n{user_msg}<|assistant|>\n` |
-| Llama-2 | `llama2` | `[INST] {user_msg} [/INST]` |
-
-**验证方法**：
 ```bash
-# 打印处理后的数据样本，检查格式是否正确
-llamafactory-cli train custom_sft.yaml --do_train false --max_samples 1
+pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 ```
 
-#### `stage` - 训练阶段
-
-```yaml
-stage: sft  # Supervised Fine-Tuning（监督微调）
-```
-
-可选值：
-- `pt`：预训练（Pre-training），用于从头训练或继续预训练
-- `sft`：监督微调（Supervised Fine-Tuning），用于指令遵循训练
-- `rm`：奖励模型（Reward Model），用于 RLHF 第二阶段
-- `ppo`：强化学习（Proximal Policy Optimization），用于 RLHF 第三阶段
-- `dpo`：直接偏好优化（Direct Preference Optimization），离线对齐
-
-#### `quantization_bit` - QLoRA 量化
-
-在显存不足时开启：
-
-```yaml
-quantization_bit: 4  # 4-bit 量化，显存占用降低 75%
-# quantization_bit: 8  # 8-bit 量化，显存占用降低 50%（精度更高）
-```
-
-**显存对照表**（LoRA + QLoRA）：
-
-| 模型规模 | 全精度 (bf16) | 4-bit QLoRA | 显存节省 |
-|---------|--------------|-------------|---------|
-| 7B | ~28GB | ~6GB | 78% |
-| 13B | ~52GB | ~10GB | 81% |
-| 70B | ~280GB | ~35GB | 87% |
+> **注意**：Windows 用户请参考 [Unsloth 官方指南](https://github.com/unslothai/unsloth#installation-instructions) 使用 WSL2 安装。
 
 ---
 
-## 3. Web UI 零代码微调实战
+## 3. 数据工程：Dataset Registration
 
-对于初学者或快速实验，Web UI 提供了直观的界面。
+**这是新手最容易卡壳的地方**。LLaMA-Factory 不直接读取 raw text，必须先在 `dataset_info.json` 中注册。
 
-**启动方式**：
-```bash
-llamafactory-cli webui
-```
+### 3.1 数据格式标准 (Alpaca vs ShareGPT)
 
-### 3.1 界面操作流程 (LLaMA Board)
+准备你的数据 `my_data.json`，推荐以下两种格式：
 
-界面通常分为几个主要特定的 Tab，操作流如下：
-
-**Step 1: 模型选择 (Model Selection)**
-- **Model Name**: 选择 `LLaMA-3-8B-Instruct`。
-- **Model Path**: 如果本地已下载，填本地绝对路径；否则留空自动下载。
-- **Adapter Path**: 训练时留空；如果是**合并/推理**阶段，填入之前的 checkpoint 路径，列表刷新后可见。
-
-**Step 2: 训练设置 (Train)**
-- **Stage**: 选 `Supervised Finetuning`。
-- **Data Dir**: 数据集目录。
-- **Dataset**: 在下拉框选择数据集（如 `alpaca_en`）。如果要用自己的数据，需先在 `data/dataset_info.json` 中配置引用。
-- **Learning Rate**: 推荐 `5e-5` (LoRA) 或 `1e-5` (Full)。
-- **Epochs**: `3.0`。
-- **Quantization**: 显存不足（如 12G/16G 显存跑 8B 模型）可选 `4` 或 `8` (QLoRA)。
-
-**Step 3: 参数设置 (Advanced)**
-- **LoRA Rank**: `16`。
-- **LoRA Alpha**: `16`。
-- **Target Modules**: 选 `all` 效果最好，或手动指定 `q_proj, v_proj`。
-
-**Step 4: 开始 (Run)**
-- 点击 **Preview Command**: 查看生成的命令行参数，方便学习 CLI 用法。
-- 点击 **Start**: 终端会开始跑进度条，Loss 曲线会实时画在右侧。
-
-**Step 5: 导出模型 (Export)**
-- 训练完成后，切换到 `Export` Tab。
-- **Max Shard Size**: 设置分块大小（如 `2GB`）。
-- **Export Dir**: 防止路径及文件名。
-- 点击 **Export**：工具会自动将 Base Model 和 LoRA Adapter 合并，并保存为完整的 Hugging Face 格式模型，可直接用于 vLLM 部署。
-
----
-
-## 4. 自定义数据集实战
-
-LLaMA-Factory 通过 `data/dataset_info.json` 管理所有数据集。
-
-### 4.1 数据准备 (Alpaca 格式)
-
-准备一个 JSON 文件 `data/my_law_data.json`：
-
+**格式 A：Alpaca 格式（适合单轮指令）**
 ```json
 [
   {
-    "instruction": "解释什么是不可抗力。",
+    "instruction": "请解释什么是量子纠缠",
     "input": "",
-    "output": "不可抗力是指不能预见、不能避免并不能克服的客观情况..."
+    "output": "量子纠缠是量子力学中的一种现象..."
   },
   {
-    "instruction": "分析该合同条款是否有效。",
-    "input": "条款内容：...",
-    "output": "根据合同法第X条，该条款无效，因为..."
+    "instruction": "将以下文本翻译成英文",
+    "input": "你好，世界",
+    "output": "Hello, World"
   }
 ]
 ```
 
-### 4.2 注册数据
+**格式 B：ShareGPT 格式（适合多轮对话）** -> **推荐**
+```json
+[
+  {
+    "conversations": [
+      { "from": "human", "value": "你好" },
+      { "from": "gpt", "value": "你好！有什么我可以帮你的吗？" },
+      { "from": "human", "value": "写首诗" },
+      { "from": "gpt", "value": "明月几时有..." }
+    ]
+  }
+]
+```
 
-编辑 `data/dataset_info.json`，加入以下内容：
+### 3.2 注册自定义数据集 (`dataset_info.json`)
+
+打开 `data/dataset_info.json`，在末尾添加你的数据集配置：
 
 ```json
-"my_law_dataset": {
-  "file_name": "my_law_data.json",
-  "columns": {
-    "prompt": "instruction",
-    "query": "input",
-    "response": "output"
+{
+  "identity": { "file_name": "identity.json" },
+  "my_custom_data": {
+    "file_name": "my_data.json", // 你的文件必须放在 data/ 目录下
+    "formatting": "sharegpt",     // 格式：alpaca 或 sharegpt
+    "columns": {
+      "messages": "conversations" // 映射你的字段名
+    }
   }
 }
 ```
 
-### 4.3 使用数据
-
-- **CLI**: 在 yaml 中设置 `dataset: my_law_dataset`。
-- **WebUI**: 刷新 Dataset 列表，即可看到 `my_law_dataset`。
+> **校验技巧**：如果不确定格式对不对，直接运行 WebUI，在数据预览页查看是否能正确解析。
 
 ---
 
-## 5. 本章小结
+## 4. 可视化微调：WebUI 全流程
 
-LLaMA-Factory 是目前（2025年）**效率通过率最高**的微调工具：
-1. **数据**：只需转成 Alpaca 格式并注册。
-2. **微调**：优先使用 `LoRA` + `FlashAttention-2`。
-3. **显存优化**：显存吃紧就开 `quantization_bit: 4` (QLoRA) 和 `gradient_accumulation_steps`。
-4. **验证**：WebUI 自带 `Chat` 页面，可以加载 Adapter 实时对话测试效果。
+WebUI 是调试参数的最佳场所。调试满意后，我们再导出命令去后台运行。
+
+### 4.1 启动与界面概览
+
+```bash
+# 启动 WebUI
+# 默认端口 7860
+llamafactory-cli webui
+```
+
+> 📸 **[截图占位]：WebUI 主界面**
+> *请截取浏览器打开 `localhost:7860` 后的界面，重点框出：语言切换（ZH）、模型选择区、微调方法区。*
+
+**核心操作步骤**：
+1.  **语言**：选择 `zh` (中文)。
+2.  **模型名称**：选择 `LLaMA-3-8B-Instruct`。
+3.  **微调方法**：选择 `LoRA`。
+4.  **适配器路径**：(训练时留空，合并模型时才填)。
+
+### 4.2 训练参数配置详解
+
+进入 **[Train] (训练)** 选项卡。
+
+> 📸 **[截图占位]：训练参数配置面板**
+> *重点展示：数据集选择、学习率、秩(Rank)、批处理大小。*
+
+**关键参数指南**：
+
+| 参数项 | 推荐值 | 说明 |
+| :--- | :--- | :--- |
+| **数据集** | `my_custom_data` | 刚刚注册的数据集。 |
+| **截断长度 (Cutoff Len)** | `1024` ~ `4096` | 根据显存决定。超长文本会被截断。 |
+| **学习率 (Learning Rate)** | `5e-5` ~ `1e-4` | LoRA 通常需要比全量微调大一点的 LR。 |
+| **轮数 (Epochs)** | `3` ~ `5` | 数据少就多跑几轮，数据多跑1-2轮。 |
+| **批处理大小 (Batch/GPU)** | `4` ~ `16` | 显存不够就减小，开梯度累积。 |
+| **梯度累积 (Grad Accum)** | `4` | 它可以模拟大 Batch Size 效果。 |
+| **LoRA 秩 (Rank)** | `8` ~ `64` | 越大显存占用越高，拟合能力越强。一般 `16` 或 `32` 够用。 |
+| **LoRA Alpha** | `16` 或 `32` | 通常设为 Rank 的 1倍或 2倍。 |
+| **Target Modules** | `all` | 推荐微调所有线性层 (q,k,v,o,gate,up,down)，效果最好。 |
+
+### 4.3 训练监控与评估
+
+点击 **[Start] (开始)** 按钮后，右侧会显示 Loss 曲线。
+
+> 📸 **[截图占位]：训练中的 Loss 曲线图**
+> *展示 Loss 随 Step 下降的趋势。*
+
+**如何判断训练正常？**
+- **Loss 快速下降**：初期从 2.0+ 降到 1.0 左右是正常的。
+- **Loss 震荡**：如果 Loss 忽高忽低，尝试减小学习率。
+- **Loss 贴地飞行 (0.01)**：可能是过拟合了，或者数据太少。
+
+---
+
+## 5. 生产化：从 WebUI 到 CLI 自动化
+
+WebUI 最大的价值在于**“预览命令”**。在生产环境中，我们需要用命令行（CLI）来运行，以便挂后台 (`nohup`) 或多机运行。
+
+### 5.1 导出 YAML 配置文件
+
+在 WebUI 点击 **[Preview Command] (预览命令)**，或者直接 **[Save Arguments]** 保存配置。
+
+推荐将配置保存为 `examples/train_lora.yaml`：
+
+```yaml
+### model
+model_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+
+### dataset
+dataset: my_custom_data
+template: llama3
+cutoff_len: 1024
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+output_dir: saves/llama3-8b/lora/sft
+logging_steps: 10
+save_steps: 500
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 4
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+flash_attn: fa2
+
+### val
+val_size: 0.1
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 500
+```
+
+### 5.2 命令行启动训练
+
+有了 yaml 文件，启动训练非常优雅：
+
+```bash
+# 单机单卡 / 单机多卡 (自动检测)
+llamafactory-cli train examples/train_lora.yaml
+```
+
+### 5.3 多机多卡分布式配置
+
+如果是多台服务器，需要结合 `FORCE_TORCHRUN=1`：
+
+```bash
+FORCE_TORCHRUN=1 NNODES=2 NODE_RANK=0 MASTER_ADDR=192.168.0.1 MASTER_PORT=29500 \
+llamafactory-cli train examples/train_lora.yaml
+```
+
+---
+
+## 6. 模型导出与合并
+
+LoRA 训练完后，你会得到一个几十 MB 的适配器文件夹。为了部署（如 vLLM 或 Ollama），通常需要将 LoRA 权重合并回基座模型（Merge）。
+
+**WebUI 操作**：
+1. 切换到 **[Export] (导出)** 选项卡。
+2. 选择 **Adapter Path**：你刚才训练的输出目录 `saves/...`。
+3. 选择 **Export Dir**：合并后模型的保存路径。
+4. 点击 **[Export]**。
+
+> 📸 **[截图占位]：模型导出界面**
+
+**CLI 操作**：
+创建 `merge.yaml`：
+
+```yaml
+### model
+model_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
+adapter_name_or_path: saves/llama3-8b/lora/sft
+template: llama3
+finetuning_type: lora
+
+### export
+export_dir: models/llama3-8b-sft-merged
+export_size: 2
+export_device: cpu
+export_legacy_format: false
+```
+
+运行导出：
+```bash
+llamafactory-cli export merge.yaml
+```
+
+---
+
+## 本章小结
+
+LLaMA-Factory 定义了 LLM 微调的**工业标准流程**：
+
+1.  **准备**：安装 Unsloth，整理数据为 ShareGPT 格式。
+2.  **注册**：在 `dataset_info.json` 中配置数据映射。
+3.  **调试**：用 WebUI 快速验证超参（Rank, LR, Batch）。
+4.  **运行**：导出 YAML，使用 `llamafactory-cli train` 挂后台训练。
+5.  **交付**：使用 `export` 命令合并权重，交付完整模型。
+
+有了这个神器，你不再需要关心底层 PyTorch 的分布式细节，专注于数据质量和模型效果即可。下一章，我们将探讨如何利用微调后的模型进行**强化学习 (RLHF/DPO)**，进一步对齐人类偏好。
