@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 450">
+  <!-- Title -->
+  <text x="600" y="30" font-size="22" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">SVM 决策边界：不同核函数的对比</text>
+
+  <!-- Panel 1: Linear Kernel -->
+  <g id="linear-kernel">
+    <!-- Background -->
+    <rect x="30" y="60" width="350" height="350" fill="#f9f9f9" stroke="#333" stroke-width="2"/>
+
+    <!-- Title -->
+    <text x="205" y="90" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">线性核 (Linear)</text>
+    <text x="205" y="110" font-size="13" text-anchor="middle" font-family="monospace" fill="#666">K(x,z) = x·z</text>
+
+    <!-- Axes -->
+    <line x1="80" y1="360" x2="330" y2="360" stroke="#666" stroke-width="1.5"/>
+    <line x1="80" y1="360" x2="80" y2="110" stroke="#666" stroke-width="1.5"/>
+    <text x="335" y="365" font-size="12" font-family="Arial, sans-serif">x₁</text>
+    <text x="75" y="105" font-size="12" font-family="Arial, sans-serif">x₂</text>
+
+    <!-- Grid -->
+    <line x1="80" y1="235" x2="330" y2="235" stroke="#ddd" stroke-width="1"/>
+    <line x1="205" y1="110" x2="205" y2="360" stroke="#ddd" stroke-width="1"/>
+
+    <!-- Data points - Class 0 (Red, upper left) -->
+    <circle cx="110" cy="150" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="130" cy="140" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="120" cy="170" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="145" cy="160" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="135" cy="185" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="100" cy="180" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+
+    <!-- Data points - Class 1 (Blue, lower right) -->
+    <circle cx="260" cy="280" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="280" cy="300" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="270" cy="320" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="300" cy="310" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="290" cy="330" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="250" cy="310" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+
+    <!-- Decision boundary - straight line -->
+    <line x1="90" y1="350" x2="320" y2="120" stroke="#2c3e50" stroke-width="3"/>
+
+    <!-- Margin lines -->
+    <line x1="80" y1="325" x2="300" y2="110" stroke="#95a5a6" stroke-width="2" stroke-dasharray="5,3" opacity="0.7"/>
+    <line x1="100" y1="360" x2="340" y2="145" stroke="#95a5a6" stroke-width="2" stroke-dasharray="5,3" opacity="0.7"/>
+
+    <!-- Label -->
+    <text x="205" y="395" font-size="13" font-weight="bold" text-anchor="middle" fill="#2c3e50" font-family="Arial, sans-serif">直线决策边界</text>
+  </g>
+
+  <!-- Panel 2: Polynomial Kernel -->
+  <g id="poly-kernel">
+    <!-- Background -->
+    <rect x="425" y="60" width="350" height="350" fill="#f9f9f9" stroke="#333" stroke-width="2"/>
+
+    <!-- Title -->
+    <text x="600" y="90" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">多项式核 (Polynomial)</text>
+    <text x="600" y="110" font-size="13" text-anchor="middle" font-family="monospace" fill="#666">K(x,z) = (x·z + 1)ᵈ</text>
+
+    <!-- Axes -->
+    <line x1="475" y1="360" x2="725" y2="360" stroke="#666" stroke-width="1.5"/>
+    <line x1="475" y1="360" x2="475" y2="110" stroke="#666" stroke-width="1.5"/>
+    <text x="730" y="365" font-size="12" font-family="Arial, sans-serif">x₁</text>
+    <text x="470" y="105" font-size="12" font-family="Arial, sans-serif">x₂</text>
+
+    <!-- Grid -->
+    <line x1="475" y1="235" x2="725" y2="235" stroke="#ddd" stroke-width="1"/>
+    <line x1="600" y1="110" x2="600" y2="360" stroke="#ddd" stroke-width="1"/>
+
+    <!-- Data points - Class 0 (Red, top and bottom) -->
+    <circle cx="520" cy="150" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="550" cy="140" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="530" cy="170" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="680" cy="150" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="660" cy="160" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="670" cy="180" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+
+    <!-- Data points - Class 1 (Blue, middle cluster) -->
+    <circle cx="580" cy="240" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="610" cy="250" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="595" cy="270" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="620" cy="280" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="600" cy="295" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="585" cy="310" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+
+    <!-- Decision boundary - curved line (parabola-like) -->
+    <path d="M 485 190 Q 600 215 715 190" stroke="#2c3e50" stroke-width="3" fill="none"/>
+
+    <!-- Margin curves -->
+    <path d="M 485 165 Q 600 185 715 165" stroke="#95a5a6" stroke-width="2" stroke-dasharray="5,3" fill="none" opacity="0.7"/>
+    <path d="M 485 325 Q 600 340 715 325" stroke="#95a5a6" stroke-width="2" stroke-dasharray="5,3" fill="none" opacity="0.7"/>
+
+    <!-- Label -->
+    <text x="600" y="395" font-size="13" font-weight="bold" text-anchor="middle" fill="#2c3e50" font-family="Arial, sans-serif">曲线决策边界</text>
+  </g>
+
+  <!-- Panel 3: RBF Kernel -->
+  <g id="rbf-kernel">
+    <!-- Background -->
+    <rect x="820" y="60" width="350" height="350" fill="#f9f9f9" stroke="#333" stroke-width="2"/>
+
+    <!-- Title -->
+    <text x="995" y="90" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">RBF核 (Gaussian)</text>
+    <text x="995" y="110" font-size="13" text-anchor="middle" font-family="monospace" fill="#666">K(x,z) = exp(-γ‖x-z‖²)</text>
+
+    <!-- Axes -->
+    <line x1="870" y1="360" x2="1120" y2="360" stroke="#666" stroke-width="1.5"/>
+    <line x1="870" y1="360" x2="870" y2="110" stroke="#666" stroke-width="1.5"/>
+    <text x="1125" y="365" font-size="12" font-family="Arial, sans-serif">x₁</text>
+    <text x="865" y="105" font-size="12" font-family="Arial, sans-serif">x₂</text>
+
+    <!-- Grid -->
+    <line x1="870" y1="235" x2="1120" y2="235" stroke="#ddd" stroke-width="1"/>
+    <line x1="995" y1="110" x2="995" y2="360" stroke="#ddd" stroke-width="1"/>
+
+    <!-- Data points - Class 0 (Red, outer ring) -->
+    <circle cx="920" cy="180" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="945" cy="160" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="975" cy="155" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1010" cy="160" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1040" cy="180" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1055" cy="215" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1060" cy="250" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1050" cy="285" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1030" cy="315" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="1000" cy="330" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="965" cy="335" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="930" cy="325" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="905" cy="295" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="890" cy="255" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="895" cy="215" r="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+
+    <!-- Data points - Class 1 (Blue, center cluster) -->
+    <circle cx="975" cy="235" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="995" cy="225" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="1015" cy="235" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="1005" cy="255" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <circle cx="985" cy="255" r="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+
+    <!-- Decision boundary - circular (ellipse) -->
+    <ellipse cx="995" cy="245" rx="75" ry="70" stroke="#2c3e50" stroke-width="3" fill="none"/>
+
+    <!-- Margin ellipses -->
+    <ellipse cx="995" cy="245" rx="60" ry="55" stroke="#95a5a6" stroke-width="2" stroke-dasharray="5,3" fill="none" opacity="0.7"/>
+    <ellipse cx="995" cy="245" rx="90" ry="85" stroke="#95a5a6" stroke-width="2" stroke-dasharray="5,3" fill="none" opacity="0.7"/>
+
+    <!-- Label -->
+    <text x="995" y="395" font-size="13" font-weight="bold" text-anchor="middle" fill="#2c3e50" font-family="Arial, sans-serif">非线性封闭边界</text>
+  </g>
+
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="450" y="420" width="300" height="20" fill="white" stroke="#333" stroke-width="1"/>
+
+    <circle cx="480" cy="430" r="6" fill="#e74c3c" stroke="#c0392b" stroke-width="1.5"/>
+    <text x="495" y="434" font-size="13" font-family="Arial, sans-serif">类别 0</text>
+
+    <circle cx="580" cy="430" r="6" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="595" y="434" font-size="13" font-family="Arial, sans-serif">类别 1</text>
+
+    <line x1="660" y1="430" x2="690" y2="430" stroke="#2c3e50" stroke-width="3"/>
+    <text x="700" y="434" font-size="13" font-family="Arial, sans-serif">决策边界</text>
+  </g>
+</svg>

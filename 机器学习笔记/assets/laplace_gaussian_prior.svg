@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Background -->
+  <rect x="0" y="0" width="600" height="400" fill="#f9f9f9"/>
+
+  <!-- Title -->
+  <text x="300" y="30" font-size="18" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">高斯先验 vs 拉普拉斯先验</text>
+
+  <!-- Axes -->
+  <line x1="50" y1="350" x2="550" y2="350" stroke="#333" stroke-width="2"/>
+  <line x1="300" y1="350" x2="300" y2="50" stroke="#333" stroke-width="2"/>
+
+  <!-- Axis labels -->
+  <text x="540" y="340" font-size="14" font-family="Arial, sans-serif">w</text>
+  <text x="260" y="60" font-size="14" font-family="Arial, sans-serif">p(w)</text>
+
+  <!-- Tick marks and labels on x-axis -->
+  <line x1="200" y1="345" x2="200" y2="355" stroke="#333" stroke-width="1"/>
+  <text x="200" y="370" font-size="11" text-anchor="middle" font-family="Arial, sans-serif">-σ</text>
+
+  <line x1="300" y1="345" x2="300" y2="355" stroke="#333" stroke-width="2"/>
+  <text x="300" y="370" font-size="11" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold">0</text>
+
+  <line x1="400" y1="345" x2="400" y2="355" stroke="#333" stroke-width="1"/>
+  <text x="400" y="370" font-size="11" text-anchor="middle" font-family="Arial, sans-serif">σ</text>
+
+  <!-- Gaussian distribution (blue, smooth bell curve) -->
+  <path d="M 100,330 C 120,320 140,290 160,240 C 180,190 200,150 220,130 C 240,110 260,100 280,95 C 290,93 295,92 300,92 C 305,92 310,93 320,95 C 340,100 360,110 380,130 C 400,150 420,190 440,240 C 460,290 480,320 500,330"
+        fill="none" stroke="#2563eb" stroke-width="3"/>
+
+  <!-- Laplace distribution (red, sharp peak) -->
+  <path d="M 100,330 L 150,280 L 200,200 L 250,130 L 280,100 L 295,90 L 300,85 L 305,90 L 320,100 L 350,130 L 400,200 L 450,280 L 500,330"
+        fill="none" stroke="#dc2626" stroke-width="3"/>
+
+  <!-- Vertical line at w=0 for emphasis -->
+  <line x1="300" y1="85" x2="300" y2="350" stroke="#888" stroke-width="1" stroke-dasharray="5,5" opacity="0.5"/>
+
+  <!-- Sharp peak annotation -->
+  <circle cx="300" cy="85" r="4" fill="#dc2626"/>
+  <text x="315" y="75" font-size="12" font-family="Arial, sans-serif" fill="#dc2626" font-weight="bold">Sharp Peak</text>
+  <text x="315" y="90" font-size="11" font-family="Arial, sans-serif" fill="#dc2626">(尖峰促使 w=0)</text>
+
+  <!-- Legend -->
+  <g id="legend">
+    <!-- Gaussian -->
+    <line x1="420" y1="120" x2="460" y2="120" stroke="#2563eb" stroke-width="3"/>
+    <text x="470" y="125" font-size="13" font-family="Arial, sans-serif" fill="#2563eb">高斯先验 (L2)</text>
+    <text x="470" y="140" font-size="10" font-family="Arial, sans-serif" fill="#666">平滑, 无稀疏性</text>
+
+    <!-- Laplace -->
+    <line x1="420" y1="160" x2="460" y2="160" stroke="#dc2626" stroke-width="3"/>
+    <text x="470" y="165" font-size="13" font-family="Arial, sans-serif" fill="#dc2626">拉普拉斯先验 (L1)</text>
+    <text x="470" y="180" font-size="10" font-family="Arial, sans-serif" fill="#666">在0处尖峰, 产生稀疏性</text>
+  </g>
+
+  <!-- Additional note -->
+  <text x="300" y="390" font-size="11" text-anchor="middle" font-family="Arial, sans-serif" fill="#555">拉普拉斯分布在原点不可导,强烈偏好参数为0</text>
+</svg>

@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <!-- 定义样式 -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#2c3e50"/>
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="400" height="400" fill="#f8f9fa"/>
+
+  <!-- 网格背景（浅色） -->
+  <line x1="50" y1="50" x2="50" y2="350" stroke="#e0e0e0" stroke-width="1"/>
+  <line x1="50" y1="350" x2="350" y2="350" stroke="#e0e0e0" stroke-width="1"/>
+  <line x1="200" y1="50" x2="200" y2="350" stroke="#e0e0e0" stroke-width="1"/>
+  <line x1="50" y1="200" x2="350" y2="200" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- 坐标轴 -->
+  <line x1="50" y1="350" x2="370" y2="350" stroke="#2c3e50" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="50" y1="350" x2="50" y2="30" stroke="#2c3e50" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 坐标轴标签 -->
+  <text x="380" y="355" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="bold">x₁</text>
+  <text x="35" y="20" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="bold">x₂</text>
+
+  <!-- 刻度标签 -->
+  <text x="40" y="360" font-family="Arial, sans-serif" font-size="14" fill="#666" text-anchor="end">0</text>
+  <text x="195" y="370" font-family="Arial, sans-serif" font-size="14" fill="#666" text-anchor="middle">1</text>
+  <text x="35" y="205" font-family="Arial, sans-serif" font-size="14" fill="#666" text-anchor="end">1</text>
+
+  <!-- 第三象限: (0,0) → -1 (红色) -->
+  <circle cx="125" cy="275" r="25" fill="#dc3545" opacity="0.7"/>
+  <text x="125" y="283" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle" font-weight="bold">-1</text>
+  <text x="125" y="320" font-family="Arial, sans-serif" font-size="12" fill="#666" text-anchor="middle">(0, 0)</text>
+
+  <!-- 第二象限: (0,1) → +1 (绿色) -->
+  <circle cx="125" cy="125" r="25" fill="#28a745" opacity="0.7"/>
+  <text x="125" y="133" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle" font-weight="bold">+1</text>
+  <text x="125" y="170" font-family="Arial, sans-serif" font-size="12" fill="#666" text-anchor="middle">(0, 1)</text>
+
+  <!-- 第四象限: (1,0) → +1 (绿色) -->
+  <circle cx="275" cy="275" r="25" fill="#28a745" opacity="0.7"/>
+  <text x="275" y="283" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle" font-weight="bold">+1</text>
+  <text x="275" y="320" font-family="Arial, sans-serif" font-size="12" fill="#666" text-anchor="middle">(1, 0)</text>
+
+  <!-- 第一象限: (1,1) → -1 (红色) -->
+  <circle cx="275" cy="125" r="25" fill="#dc3545" opacity="0.7"/>
+  <text x="275" y="133" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle" font-weight="bold">-1</text>
+  <text x="275" y="170" font-family="Arial, sans-serif" font-size="12" fill="#666" text-anchor="middle">(1, 1)</text>
+
+  <!-- 尝试的分离线（用虚线表示无法分离） -->
+  <line x1="50" y1="200" x2="350" y2="200" stroke="#999" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5"/>
+  <line x1="200" y1="50" x2="200" y2="350" stroke="#999" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5"/>
+
+  <!-- 对角线（也无法分离） -->
+  <line x1="50" y1="50" x2="350" y2="350" stroke="#999" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5"/>
+  <line x1="50" y1="350" x2="350" y2="50" stroke="#999" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5"/>
+
+  <!-- 标题和说明 -->
+  <text x="200" y="390" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle" font-weight="bold">
+    无法用一条直线分离！
+  </text>
+</svg>

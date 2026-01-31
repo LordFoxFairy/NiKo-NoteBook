@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" style="background: white;">
+  <!-- 标题 -->
+  <text x="300" y="30" font-size="18" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">
+    Loss Functions Comparison
+  </text>
+
+  <!-- 坐标轴 -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333" />
+    </marker>
+  </defs>
+
+  <!-- X轴 -->
+  <line x1="50" y1="320" x2="570" y2="320" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="580" y="325" font-size="14" font-family="Arial, sans-serif">y·f(x)</text>
+
+  <!-- Y轴 -->
+  <line x1="300" y1="350" x2="300" y2="50" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="305" y="45" font-size="14" font-family="Arial, sans-serif">Loss</text>
+
+  <!-- X轴刻度 -->
+  <line x1="175" y1="315" x2="175" y2="325" stroke="#333" stroke-width="1.5" />
+  <text x="175" y="340" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">-1</text>
+
+  <line x1="300" y1="315" x2="300" y2="325" stroke="#333" stroke-width="1.5" />
+  <text x="300" y="340" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">0</text>
+
+  <line x1="425" y1="315" x2="425" y2="325" stroke="#333" stroke-width="1.5" />
+  <text x="425" y="340" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">1</text>
+
+  <line x1="550" y1="315" x2="550" y2="325" stroke="#333" stroke-width="1.5" />
+  <text x="550" y="340" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">2</text>
+
+  <!-- Y轴刻度 -->
+  <line x1="295" y1="195" x2="305" y2="195" stroke="#333" stroke-width="1.5" />
+  <text x="285" y="200" font-size="12" text-anchor="end" font-family="Arial, sans-serif">1</text>
+
+  <line x1="295" y1="70" x2="305" y2="70" stroke="#333" stroke-width="1.5" />
+  <text x="285" y="75" font-size="12" text-anchor="end" font-family="Arial, sans-serif">2</text>
+
+  <line x1="295" y1="257.5" x2="305" y2="257.5" stroke="#333" stroke-width="1.5" />
+  <text x="285" y="262" font-size="12" text-anchor="end" font-family="Arial, sans-serif">0.5</text>
+
+  <!-- 0-1 Loss (黑色阶跃函数) -->
+  <!-- y·f(x) < 0 时 loss = 1 -->
+  <line x1="50" y1="195" x2="300" y2="195" stroke="#000" stroke-width="2.5" />
+  <!-- 在 y·f(x) = 0 处的跳跃 -->
+  <line x1="300" y1="195" x2="300" y2="320" stroke="#000" stroke-width="2.5" stroke-dasharray="3,3" />
+  <!-- y·f(x) >= 0 时 loss = 0 -->
+  <line x1="300" y1="320" x2="570" y2="320" stroke="#000" stroke-width="2.5" />
+  <circle cx="300" cy="195" r="3" fill="#000" />
+  <circle cx="300" cy="320" r="3" fill="white" stroke="#000" stroke-width="2" />
+
+  <!-- Hinge Loss (绿色,在z=1处弯折) -->
+  <!-- 从 y·f(x) = -2 (x=50) 到 y·f(x) = 1 (x=425), loss从3到0 线性下降 -->
+  <!-- loss = max(0, 1 - y·f(x)) -->
+  <!-- 当 y·f(x) = -2 时, loss = 3 (y=70-62.5=70) -->
+  <!-- 当 y·f(x) = 1 时, loss = 0 (y=320) -->
+  <line x1="50" y1="70" x2="425" y2="320" stroke="#22aa22" stroke-width="2.5" />
+  <!-- y·f(x) >= 1 时 loss = 0 -->
+  <line x1="425" y1="320" x2="570" y2="320" stroke="#22aa22" stroke-width="2.5" />
+  <!-- 在弯折点标记 -->
+  <circle cx="425" cy="320" r="3" fill="#22aa22" />
+
+  <!-- Logistic Loss (蓝色平滑曲线,可选) -->
+  <!-- loss = log(1 + exp(-y·f(x))) -->
+  <!-- 生成平滑曲线 -->
+  <path d="M 50,68
+           C 100,65 150,62 175,59
+           C 200,55 225,50 250,43
+           C 275,35 287.5,30 300,24
+           C 312.5,18 325,14 350,10
+           C 375,7 400,5 425,4
+           C 462.5,3 500,2.5 537.5,2
+           L 570,2"
+        stroke="#2277dd" stroke-width="2.5" fill="none" />
+
+  <!-- 图例 -->
+  <g transform="translate(380, 80)">
+    <!-- 0-1 Loss -->
+    <line x1="0" y1="0" x2="30" y2="0" stroke="#000" stroke-width="2.5" />
+    <text x="40" y="5" font-size="13" font-family="Arial, sans-serif">0-1 Loss</text>
+
+    <!-- Hinge Loss -->
+    <line x1="0" y1="25" x2="30" y2="25" stroke="#22aa22" stroke-width="2.5" />
+    <text x="40" y="30" font-size="13" font-family="Arial, sans-serif">Hinge Loss</text>
+
+    <!-- Logistic Loss -->
+    <line x1="0" y1="50" x2="30" y2="50" stroke="#2277dd" stroke-width="2.5" />
+    <text x="40" y="55" font-size="13" font-family="Arial, sans-serif">Logistic Loss</text>
+  </g>
+
+  <!-- 添加关键点标注 -->
+  <circle cx="425" cy="320" r="4" fill="#22aa22" />
+  <text x="425" y="310" font-size="11" text-anchor="middle" fill="#22aa22" font-family="Arial, sans-serif">z=1</text>
+</svg>

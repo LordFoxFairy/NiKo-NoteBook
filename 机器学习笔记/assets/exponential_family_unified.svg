@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2c3e50"/>
+    </marker>
+
+    <!-- Gradient for main box -->
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.1"/>
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.2"/>
+    </linearGradient>
+
+    <!-- Gradient for distribution boxes -->
+    <linearGradient id="distGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f093fb;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#f5576c;stop-opacity:0.2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial, sans-serif" font-size="24" font-weight="bold"
+        text-anchor="middle" fill="#2c3e50">指数族分布的统一框架</text>
+
+  <!-- Main exponential family box -->
+  <rect x="100" y="60" width="600" height="180" rx="10"
+        fill="url(#mainGrad)" stroke="#667eea" stroke-width="3"/>
+
+  <!-- Main formula -->
+  <text x="400" y="100" font-family="serif" font-size="18" font-weight="bold"
+        text-anchor="middle" fill="#2c3e50">指数族标准形式</text>
+
+  <text x="400" y="140" font-family="serif" font-size="20"
+        text-anchor="middle" fill="#1a1a1a" font-style="italic">
+    P(x|η) = h(x) exp(η<tspan baseline-shift="super" font-size="14">T</tspan>T(x) − A(η))
+  </text>
+
+  <!-- Components explanation -->
+  <text x="120" y="175" font-family="Arial, sans-serif" font-size="13" fill="#34495e">
+    η: 自然参数
+  </text>
+  <text x="250" y="175" font-family="Arial, sans-serif" font-size="13" fill="#34495e">
+    T(x): 充分统计量
+  </text>
+  <text x="400" y="175" font-family="Arial, sans-serif" font-size="13" fill="#34495e">
+    A(η): 对数配分函数
+  </text>
+  <text x="580" y="175" font-family="Arial, sans-serif" font-size="13" fill="#34495e">
+    h(x): 基础测度
+  </text>
+
+  <!-- Key properties box -->
+  <rect x="100" y="210" width="250" height="90" rx="5"
+        fill="#e8f5e9" stroke="#4caf50" stroke-width="2"/>
+  <text x="225" y="235" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+        text-anchor="middle" fill="#2e7d32">核心性质</text>
+  <text x="115" y="260" font-family="serif" font-size="13" fill="#1b5e20">
+    ∇<tspan baseline-shift="sub" font-size="10">η</tspan>A(η) = 𝔼[T(x)]
+  </text>
+  <text x="115" y="285" font-family="serif" font-size="13" fill="#1b5e20">
+    ∇<tspan baseline-shift="sub" font-size="10">η</tspan><tspan baseline-shift="super" font-size="10">2</tspan>A(η) = Cov[T(x)]
+  </text>
+
+  <!-- GLM connection box -->
+  <rect x="450" y="210" width="250" height="90" rx="5"
+        fill="#fff3e0" stroke="#ff9800" stroke-width="2"/>
+  <text x="575" y="235" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+        text-anchor="middle" fill="#e65100">广义线性模型</text>
+  <text x="465" y="260" font-family="serif" font-size="13" fill="#bf360c">
+    η = w<tspan baseline-shift="super" font-size="10">T</tspan>x  (线性预测器)
+  </text>
+  <text x="465" y="285" font-family="serif" font-size="13" fill="#bf360c">
+    ∇<tspan baseline-shift="sub" font-size="10">w</tspan>ℒ = −Σ(y<tspan baseline-shift="sub" font-size="10">i</tspan> − μ<tspan baseline-shift="sub" font-size="10">i</tspan>)x<tspan baseline-shift="sub" font-size="10">i</tspan>  (统一梯度)
+  </text>
+
+  <!-- Arrow label -->
+  <text x="400" y="335" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+        text-anchor="middle" fill="#7f8c8d">特例实现 ↓</text>
+
+  <!-- Distribution boxes -->
+  <!-- Gaussian -->
+  <g id="gaussian">
+    <rect x="50" y="360" width="160" height="200" rx="8"
+          fill="url(#distGrad)" stroke="#8e44ad" stroke-width="2"/>
+    <text x="130" y="385" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+          text-anchor="middle" fill="#6c3483">高斯分布</text>
+    <text x="130" y="410" font-family="serif" font-size="12"
+          text-anchor="middle" fill="#512e5f">𝒩(μ, σ²)</text>
+
+    <text x="60" y="435" font-family="monospace" font-size="11" fill="#2c3e50">
+      η = μ/σ²
+    </text>
+    <text x="60" y="455" font-family="monospace" font-size="11" fill="#2c3e50">
+      T(x) = x
+    </text>
+    <text x="60" y="475" font-family="monospace" font-size="11" fill="#2c3e50">
+      A(η) = σ²η²/2
+    </text>
+    <text x="60" y="505" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      应用: 线性回归
+    </text>
+    <text x="60" y="525" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      方差恒定
+    </text>
+  </g>
+
+  <!-- Bernoulli -->
+  <g id="bernoulli">
+    <rect x="230" y="360" width="160" height="200" rx="8"
+          fill="url(#distGrad)" stroke="#e74c3c" stroke-width="2"/>
+    <text x="310" y="385" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+          text-anchor="middle" fill="#c0392b">伯努利分布</text>
+    <text x="310" y="410" font-family="serif" font-size="12"
+          text-anchor="middle" fill="#922b21">Bernoulli(μ)</text>
+
+    <text x="240" y="435" font-family="monospace" font-size="11" fill="#2c3e50">
+      η = log(μ/(1−μ))
+    </text>
+    <text x="240" y="455" font-family="monospace" font-size="11" fill="#2c3e50">
+      T(x) = x
+    </text>
+    <text x="240" y="475" font-family="monospace" font-size="11" fill="#2c3e50">
+      A(η) = log(1+e<tspan baseline-shift="super" font-size="9">η</tspan>)
+    </text>
+    <text x="240" y="505" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      应用: 逻辑回归
+    </text>
+    <text x="240" y="525" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      μ = σ(η) sigmoid
+    </text>
+  </g>
+
+  <!-- Poisson -->
+  <g id="poisson">
+    <rect x="410" y="360" width="160" height="200" rx="8"
+          fill="url(#distGrad)" stroke="#27ae60" stroke-width="2"/>
+    <text x="490" y="385" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+          text-anchor="middle" fill="#1e8449">泊松分布</text>
+    <text x="490" y="410" font-family="serif" font-size="12"
+          text-anchor="middle" fill="#145a32">Poisson(λ)</text>
+
+    <text x="420" y="435" font-family="monospace" font-size="11" fill="#2c3e50">
+      η = log λ
+    </text>
+    <text x="420" y="455" font-family="monospace" font-size="11" fill="#2c3e50">
+      T(x) = x
+    </text>
+    <text x="420" y="475" font-family="monospace" font-size="11" fill="#2c3e50">
+      A(η) = e<tspan baseline-shift="super" font-size="9">η</tspan>
+    </text>
+    <text x="420" y="505" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      应用: 计数数据
+    </text>
+    <text x="420" y="525" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      均值=方差
+    </text>
+  </g>
+
+  <!-- Exponential -->
+  <g id="exponential">
+    <rect x="590" y="360" width="160" height="200" rx="8"
+          fill="url(#distGrad)" stroke="#3498db" stroke-width="2"/>
+    <text x="670" y="385" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+          text-anchor="middle" fill="#2874a6">指数分布</text>
+    <text x="670" y="410" font-family="serif" font-size="12"
+          text-anchor="middle" fill="#1b4f72">Exp(λ)</text>
+
+    <text x="600" y="435" font-family="monospace" font-size="11" fill="#2c3e50">
+      η = −λ
+    </text>
+    <text x="600" y="455" font-family="monospace" font-size="11" fill="#2c3e50">
+      T(x) = x
+    </text>
+    <text x="600" y="475" font-family="monospace" font-size="11" fill="#2c3e50">
+      A(η) = −log(−η)
+    </text>
+    <text x="600" y="505" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      应用: 等待时间
+    </text>
+    <text x="600" y="525" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">
+      最大熵(给定均值)
+    </text>
+  </g>
+
+  <!-- Connecting arrows from main formula to distributions -->
+  <path d="M 225 240 L 130 360" stroke="#95a5a6" stroke-width="1.5"
+        stroke-dasharray="5,5" fill="none" marker-end="url(#arrowhead)" opacity="0.5"/>
+  <path d="M 300 240 L 310 360" stroke="#95a5a6" stroke-width="1.5"
+        stroke-dasharray="5,5" fill="none" marker-end="url(#arrowhead)" opacity="0.5"/>
+  <path d="M 400 240 L 490 360" stroke="#95a5a6" stroke-width="1.5"
+        stroke-dasharray="5,5" fill="none" marker-end="url(#arrowhead)" opacity="0.5"/>
+  <path d="M 575 240 L 670 360" stroke="#95a5a6" stroke-width="1.5"
+        stroke-dasharray="5,5" fill="none" marker-end="url(#arrowhead)" opacity="0.5"/>
+
+  <!-- Bottom note -->
+  <text x="400" y="585" font-family="Arial, sans-serif" font-size="11"
+        text-anchor="middle" fill="#7f8c8d" font-style="italic">
+    注: 所有这些看似不同的分布都共享同一个数学结构,只是A(η)不同
+  </text>
+</svg>

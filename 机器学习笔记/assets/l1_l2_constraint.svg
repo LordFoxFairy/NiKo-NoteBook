@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <!-- Left panel: L2 (Circle) -->
+  <g id="L2">
+    <!-- Background -->
+    <rect x="0" y="0" width="400" height="400" fill="#f9f9f9"/>
+
+    <!-- Title -->
+    <text x="200" y="25" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">L2 约束 (圆形)</text>
+
+    <!-- Axes -->
+    <line x1="50" y1="350" x2="350" y2="350" stroke="#333" stroke-width="2"/>
+    <line x1="50" y1="350" x2="50" y2="50" stroke="#333" stroke-width="2"/>
+
+    <!-- Axis labels -->
+    <text x="350" y="340" font-size="12" font-family="Arial, sans-serif">w₁</text>
+    <text x="30" y="55" font-size="12" font-family="Arial, sans-serif">w₂</text>
+    <text x="50" y="365" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">0</text>
+
+    <!-- L2 constraint circle (blue) -->
+    <circle cx="200" cy="200" r="100" fill="none" stroke="#2563eb" stroke-width="3"/>
+
+    <!-- Loss contour ellipses (green) -->
+    <ellipse cx="250" cy="150" rx="80" ry="50" fill="none" stroke="#059669" stroke-width="2" opacity="0.6" transform="rotate(-30 250 150)"/>
+    <ellipse cx="250" cy="150" rx="120" ry="75" fill="none" stroke="#059669" stroke-width="2" opacity="0.4" transform="rotate(-30 250 150)"/>
+    <ellipse cx="250" cy="150" rx="160" ry="100" fill="none" stroke="#059669" stroke-width="2" opacity="0.2" transform="rotate(-30 250 150)"/>
+
+    <!-- OLS center -->
+    <circle cx="250" cy="150" r="4" fill="#059669"/>
+    <text x="260" y="145" font-size="11" font-family="Arial, sans-serif" fill="#059669">w_OLS</text>
+
+    <!-- Tangent point (not on axis) -->
+    <circle cx="235" cy="185" r="5" fill="#dc2626"/>
+    <text x="245" y="190" font-size="11" font-family="Arial, sans-serif" fill="#dc2626">w*</text>
+
+    <!-- Legend -->
+    <text x="70" y="380" font-size="10" font-family="Arial, sans-serif" fill="#555">切点通常不在坐标轴上</text>
+  </g>
+
+  <!-- Right panel: L1 (Diamond) -->
+  <g id="L1">
+    <!-- Background -->
+    <rect x="400" y="0" width="400" height="400" fill="#f9f9f9"/>
+
+    <!-- Title -->
+    <text x="600" y="25" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">L1 约束 (菱形)</text>
+
+    <!-- Axes -->
+    <line x1="450" y1="350" x2="750" y2="350" stroke="#333" stroke-width="2"/>
+    <line x1="450" y1="350" x2="450" y2="50" stroke="#333" stroke-width="2"/>
+
+    <!-- Axis labels -->
+    <text x="750" y="340" font-size="12" font-family="Arial, sans-serif">w₁</text>
+    <text x="430" y="55" font-size="12" font-family="Arial, sans-serif">w₂</text>
+    <text x="450" y="365" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">0</text>
+
+    <!-- L1 constraint diamond (red) -->
+    <polygon points="600,100 700,200 600,300 500,200" fill="none" stroke="#dc2626" stroke-width="3"/>
+
+    <!-- Loss contour ellipses (green) -->
+    <ellipse cx="650" cy="150" rx="80" ry="50" fill="none" stroke="#059669" stroke-width="2" opacity="0.6" transform="rotate(-30 650 150)"/>
+    <ellipse cx="650" cy="150" rx="120" ry="75" fill="none" stroke="#059669" stroke-width="2" opacity="0.4" transform="rotate(-30 650 150)"/>
+    <ellipse cx="650" cy="150" rx="160" ry="100" fill="none" stroke="#059669" stroke-width="2" opacity="0.2" transform="rotate(-30 650 150)"/>
+
+    <!-- OLS center -->
+    <circle cx="650" cy="150" r="4" fill="#059669"/>
+    <text x="660" y="145" font-size="11" font-family="Arial, sans-serif" fill="#059669">w_OLS</text>
+
+    <!-- Tangent point (on axis - vertex) -->
+    <circle cx="600" cy="100" r="5" fill="#dc2626"/>
+    <text x="610" y="95" font-size="11" font-family="Arial, sans-serif" fill="#dc2626">w*</text>
+
+    <!-- Highlight w1=0 -->
+    <text x="610" y="110" font-size="11" font-family="Arial, sans-serif" fill="#dc2626" font-weight="bold">w₁ = 0</text>
+
+    <!-- Legend -->
+    <text x="470" y="380" font-size="10" font-family="Arial, sans-serif" fill="#555">切点在顶点(坐标轴上)</text>
+  </g>
+</svg>

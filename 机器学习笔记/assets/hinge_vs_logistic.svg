@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333" />
+    </marker>
+    <style>
+      .axis { stroke: #333; stroke-width: 2; }
+      .grid { stroke: #e5e7eb; stroke-width: 0.5; }
+      .hinge { stroke: #dc2626; stroke-width: 3; fill: none; }
+      .logistic { stroke: #2563eb; stroke-width: 3; fill: none; }
+      .zero-one { stroke: #16a34a; stroke-width: 3; fill: none; stroke-dasharray: 5,5; }
+      .label { font-family: 'Georgia', serif; font-size: 16px; }
+      .title { font-family: 'Georgia', serif; font-size: 22px; font-weight: bold; }
+      .annotation { font-family: 'Arial', sans-serif; font-size: 14px; }
+    </style>
+  </defs>
+
+  <!-- 标题 -->
+  <text x="400" y="35" text-anchor="middle" class="title" fill="#1f2937">
+    Hinge Loss vs Logistic Loss (Cross-Entropy)
+  </text>
+
+  <!-- 网格 -->
+  <g class="grid">
+    <line x1="100" y1="100" x2="100" y2="500"/>
+    <line x1="200" y1="100" x2="200" y2="500"/>
+    <line x1="300" y1="100" x2="300" y2="500"/>
+    <line x1="400" y1="100" x2="400" y2="500"/>
+    <line x1="500" y1="100" x2="500" y2="500"/>
+    <line x1="600" y1="100" x2="600" y2="500"/>
+    <line x1="700" y1="100" x2="700" y2="500"/>
+
+    <line x1="50" y1="150" x2="750" y2="150"/>
+    <line x1="50" y1="200" x2="750" y2="200"/>
+    <line x1="50" y1="250" x2="750" y2="250"/>
+    <line x1="50" y1="300" x2="750" y2="300"/>
+    <line x1="50" y1="350" x2="750" y2="350"/>
+    <line x1="50" y1="400" x2="750" y2="400"/>
+    <line x1="50" y1="450" x2="750" y2="450"/>
+  </g>
+
+  <!-- 坐标轴 -->
+  <line x1="50" y1="500" x2="750" y2="500" class="axis" marker-end="url(#arrowhead)"/>
+  <line x1="50" y1="500" x2="50" y2="80" class="axis" marker-end="url(#arrowhead)"/>
+
+  <!-- 坐标轴标签 -->
+  <text x="760" y="505" class="label">y·f(x)</text>
+  <text x="30" y="75" class="label">Loss</text>
+
+  <!-- X轴刻度 -->
+  <g class="annotation">
+    <line x1="100" y1="495" x2="100" y2="505" stroke="#333" stroke-width="2"/>
+    <text x="100" y="520" text-anchor="middle">-2</text>
+
+    <line x1="200" y1="495" x2="200" y2="505" stroke="#333" stroke-width="2"/>
+    <text x="200" y="520" text-anchor="middle">-1</text>
+
+    <line x1="300" y1="495" x2="300" y2="505" stroke="#333" stroke-width="2"/>
+    <text x="300" y="520" text-anchor="middle">0</text>
+
+    <line x1="400" y1="495" x2="400" y2="505" stroke="#333" stroke-width="2"/>
+    <text x="400" y="520" text-anchor="middle">1</text>
+
+    <line x1="500" y1="495" x2="500" y2="505" stroke="#333" stroke-width="2"/>
+    <text x="500" y="520" text-anchor="middle">2</text>
+
+    <line x1="600" y1="495" x2="600" y2="505" stroke="#333" stroke-width="2"/>
+    <text x="600" y="520" text-anchor="middle">3</text>
+  </g>
+
+  <!-- Y轴刻度 -->
+  <g class="annotation">
+    <line x1="45" y1="500" x2="55" y2="500" stroke="#333" stroke-width="2"/>
+    <text x="35" y="505" text-anchor="end">0</text>
+
+    <line x1="45" y1="400" x2="55" y2="400" stroke="#333" stroke-width="2"/>
+    <text x="35" y="405" text-anchor="end">1</text>
+
+    <line x1="45" y1="300" x2="55" y2="300" stroke="#333" stroke-width="2"/>
+    <text x="35" y="305" text-anchor="end">2</text>
+
+    <line x1="45" y1="200" x2="55" y2="200" stroke="#333" stroke-width="2"/>
+    <text x="35" y="205" text-anchor="end">3</text>
+
+    <line x1="45" y1="100" x2="55" y2="100" stroke="#333" stroke-width="2"/>
+    <text x="35" y="105" text-anchor="end">4</text>
+  </g>
+
+  <!-- Hinge Loss: max(0, 1 - y·f(x)) -->
+  <path d="M 50,200 L 400,200 L 700,500" class="hinge"/>
+
+  <!-- Logistic Loss: log(1 + exp(-y·f(x))) -->
+  <path d="M 50,103 Q 100,118 150,140 Q 200,170 250,210 Q 300,260 350,320 Q 400,385 450,445 Q 500,482 550,497 Q 600,500 650,500 L 700,500" class="logistic"/>
+
+  <!-- 0-1 Loss (理论参考) -->
+  <path d="M 50,100 L 300,100 L 300,500 L 700,500" class="zero-one"/>
+
+  <!-- 关键点标注 -->
+  <!-- Hinge Loss 拐点 -->
+  <circle cx="400" cy="200" r="5" fill="#dc2626" stroke="#7f1d1d" stroke-width="2"/>
+  <text x="410" y="185" class="annotation" fill="#dc2626" font-weight="bold">
+    (1, 0)
+  </text>
+
+  <!-- 垂直虚线标注 y·f(x) = 1 -->
+  <line x1="400" y1="100" x2="400" y2="500" stroke="#fbbf24" stroke-width="2" stroke-dasharray="3,3"/>
+  <text x="405" y="120" class="annotation" fill="#f59e0b" font-weight="bold">
+    y·f(x) = 1
+  </text>
+
+  <!-- 图例 -->
+  <g transform="translate(520, 120)">
+    <rect x="0" y="0" width="230" height="140" fill="white" stroke="#d1d5db" stroke-width="2" rx="5"/>
+
+    <text x="10" y="25" class="annotation" font-weight="bold">损失函数对比</text>
+
+    <line x1="10" y1="45" x2="50" y2="45" class="hinge"/>
+    <text x="60" y="50" class="annotation" fill="#dc2626">
+      Hinge Loss (SVM)
+    </text>
+
+    <line x1="10" y1="70" x2="50" y2="70" class="logistic"/>
+    <text x="60" y="75" class="annotation" fill="#2563eb">
+      Logistic Loss
+    </text>
+
+    <line x1="10" y1="95" x2="50" y2="95" class="zero-one"/>
+    <text x="60" y="100" class="annotation" fill="#16a34a">
+      0-1 Loss (理论)
+    </text>
+
+    <text x="10" y="125" class="annotation" font-size="12px" fill="#6b7280">
+      Hinge在y·f(x)≥1时为0
+    </text>
+  </g>
+
+  <!-- 关键特性标注 -->
+  <g transform="translate(50, 550)">
+    <rect x="0" y="0" width="700" height="40" fill="#f3f4f6" rx="5"/>
+
+    <text x="10" y="15" class="annotation" font-size="13px" font-weight="bold" fill="#1f2937">
+      关键区别:
+    </text>
+
+    <text x="10" y="32" class="annotation" font-size="12px" fill="#374151">
+      • Hinge Loss 有"零区域"(y·f(x)≥1) → 稀疏解(支持向量)   • Logistic Loss 始终>0 → 所有样本都有贡献   • 都是0-1 Loss的凸上界
+    </text>
+  </g>
+
+  <!-- 稀疏性标注 -->
+  <g transform="translate(430, 420)">
+    <path d="M 0,0 L 30,-80" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowhead)" fill="none"/>
+    <rect x="-100" y="-130" width="170" height="45" fill="#fee2e2" stroke="#dc2626" stroke-width="1" rx="3"/>
+    <text x="-95" y="-110" class="annotation" font-size="12px" fill="#7f1d1d" font-weight="bold">
+      SVM稀疏性的来源
+    </text>
+    <text x="-95" y="-95" class="annotation" font-size="11px" fill="#991b1b">
+      该区域梯度为0
+    </text>
+  </g>
+
+</svg>

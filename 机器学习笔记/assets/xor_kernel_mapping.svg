@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500">
+  <!-- Title -->
+  <text x="500" y="30" font-size="20" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">XOR 问题：从2D到3D的映射</text>
+
+  <!-- Left panel: 2D XOR (not separable) -->
+  <g id="left-panel">
+    <!-- Background -->
+    <rect x="50" y="60" width="400" height="400" fill="#f9f9f9" stroke="#ddd" stroke-width="2"/>
+
+    <!-- Title -->
+    <text x="250" y="90" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">2D空间：线性不可分</text>
+
+    <!-- Axes -->
+    <line x1="100" y1="410" x2="400" y2="410" stroke="#333" stroke-width="2"/>
+    <line x1="100" y1="410" x2="100" y2="110" stroke="#333" stroke-width="2"/>
+
+    <!-- Axis labels -->
+    <text x="390" y="435" font-size="14" font-family="Arial, sans-serif">x₁</text>
+    <text x="70" y="120" font-size="14" font-family="Arial, sans-serif">x₂</text>
+
+    <!-- Grid lines -->
+    <line x1="100" y1="260" x2="400" y2="260" stroke="#ccc" stroke-width="1" stroke-dasharray="5,5"/>
+    <line x1="250" y1="110" x2="250" y2="410" stroke="#ccc" stroke-width="1" stroke-dasharray="5,5"/>
+
+    <!-- Tick marks and labels -->
+    <line x1="100" y1="410" x2="100" y2="415" stroke="#333" stroke-width="2"/>
+    <text x="100" y="430" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">0</text>
+
+    <line x1="250" y1="410" x2="250" y2="415" stroke="#333" stroke-width="2"/>
+    <text x="250" y="430" font-size="12" text-anchor="middle" font-family="Arial, sans-serif">1</text>
+
+    <line x1="100" y1="410" x2="95" y2="410" stroke="#333" stroke-width="2"/>
+    <text x="85" y="415" font-size="12" text-anchor="end" font-family="Arial, sans-serif">0</text>
+
+    <line x1="100" y1="260" x2="95" y2="260" stroke="#333" stroke-width="2"/>
+    <text x="85" y="265" font-size="12" text-anchor="end" font-family="Arial, sans-serif">1</text>
+
+    <!-- Data points (Class 0: Red) -->
+    <circle cx="130" cy="380" r="12" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <text x="130" y="385" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">0</text>
+
+    <circle cx="370" cy="140" r="12" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <text x="370" y="145" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">0</text>
+
+    <!-- Data points (Class 1: Blue) -->
+    <circle cx="130" cy="140" r="12" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <text x="130" y="145" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">1</text>
+
+    <circle cx="370" cy="380" r="12" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <text x="370" y="385" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">1</text>
+
+    <!-- Failed separation line -->
+    <line x1="110" y1="390" x2="380" y2="150" stroke="#95a5a6" stroke-width="3" stroke-dasharray="10,5" opacity="0.6"/>
+    <text x="280" y="240" font-size="14" fill="#7f8c8d" font-style="italic" font-family="Arial, sans-serif">无法用直线分开</text>
+
+    <!-- Point labels -->
+    <text x="130" y="405" font-size="11" text-anchor="middle" font-family="monospace">(0,0)</text>
+    <text x="130" y="125" font-size="11" text-anchor="middle" font-family="monospace">(0,1)</text>
+    <text x="370" y="405" font-size="11" text-anchor="middle" font-family="monospace">(1,0)</text>
+    <text x="370" y="125" font-size="11" text-anchor="middle" font-family="monospace">(1,1)</text>
+  </g>
+
+  <!-- Arrow -->
+  <g id="arrow">
+    <path d="M 470 260 L 520 260" stroke="#2c3e50" stroke-width="4" fill="none" marker-end="url(#arrowhead)"/>
+    <text x="495" y="250" font-size="14" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">φ(x)</text>
+    <defs>
+      <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <polygon points="0 0, 10 3, 0 6" fill="#2c3e50"/>
+      </marker>
+    </defs>
+  </g>
+
+  <!-- Right panel: 3D mapping (separable) -->
+  <g id="right-panel">
+    <!-- Background -->
+    <rect x="550" y="60" width="400" height="400" fill="#f9f9f9" stroke="#ddd" stroke-width="2"/>
+
+    <!-- Title -->
+    <text x="750" y="90" font-size="16" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">3D空间：平面可分</text>
+
+    <!-- 3D Axes (isometric projection) -->
+    <g id="axes-3d">
+      <!-- Z axis (vertical) -->
+      <line x1="650" y1="380" x2="650" y2="150" stroke="#333" stroke-width="2"/>
+      <text x="630" y="140" font-size="14" font-family="Arial, sans-serif">z=x₁x₂</text>
+
+      <!-- X axis (right-down diagonal) -->
+      <line x1="650" y1="380" x2="850" y2="420" stroke="#333" stroke-width="2"/>
+      <text x="860" y="430" font-size="14" font-family="Arial, sans-serif">x₁</text>
+
+      <!-- Y axis (left-down diagonal) -->
+      <line x1="650" y1="380" x2="600" y2="420" stroke="#333" stroke-width="2"/>
+      <text x="580" y="430" font-size="14" font-family="Arial, sans-serif">x₂</text>
+    </g>
+
+    <!-- Separation plane (semi-transparent) -->
+    <g id="plane">
+      <path d="M 600 300 L 850 340 L 850 280 L 600 240 Z" fill="#2ecc71" opacity="0.3" stroke="#27ae60" stroke-width="2"/>
+      <text x="730" y="310" font-size="13" font-weight="bold" fill="#27ae60" font-family="Arial, sans-serif">z = 0.5</text>
+    </g>
+
+    <!-- 3D Data points -->
+    <!-- Point (0,0,0) - Class 0 - Bottom -->
+    <circle cx="650" cy="380" r="12" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <text x="650" y="385" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">0</text>
+    <text x="650" y="405" font-size="10" text-anchor="middle" font-family="monospace">(0,0,0)</text>
+
+    <!-- Point (1,1,1) - Class 0 - Top -->
+    <circle cx="800" cy="260" r="12" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <text x="800" y="265" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">0</text>
+    <text x="800" y="245" font-size="10" text-anchor="middle" font-family="monospace">(1,1,1)</text>
+
+    <!-- Point (0,1,0) - Class 1 - Bottom left -->
+    <circle cx="625" cy="355" r="12" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <text x="625" y="360" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">1</text>
+    <text x="625" y="340" font-size="10" text-anchor="middle" font-family="monospace">(0,1,0)</text>
+
+    <!-- Point (1,0,0) - Class 1 - Bottom right -->
+    <circle cx="750" cy="380" r="12" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <text x="750" y="385" font-size="10" fill="white" text-anchor="middle" font-weight="bold" font-family="Arial, sans-serif">1</text>
+    <text x="750" y="405" font-size="10" text-anchor="middle" font-family="monospace">(1,0,0)</text>
+
+    <!-- Annotations -->
+    <text x="870" y="320" font-size="12" fill="#27ae60" font-style="italic" font-family="Arial, sans-serif">红点在平面上方</text>
+    <text x="870" y="340" font-size="12" fill="#27ae60" font-style="italic" font-family="Arial, sans-serif">蓝点在平面下方</text>
+    <text x="870" y="360" font-size="12" fill="#27ae60" font-weight="bold" font-family="Arial, sans-serif">完美分离!</text>
+  </g>
+
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="400" y="480" width="200" height="15" fill="white" stroke="#ddd" stroke-width="1"/>
+    <circle cx="420" cy="487" r="6" fill="#e74c3c" stroke="#c0392b" stroke-width="1"/>
+    <text x="435" y="491" font-size="12" font-family="Arial, sans-serif">类别 0 (XOR=0)</text>
+
+    <circle cx="540" cy="487" r="6" fill="#3498db" stroke="#2980b9" stroke-width="1"/>
+    <text x="555" y="491" font-size="12" font-family="Arial, sans-serif">类别 1 (XOR=1)</text>
+  </g>
+</svg>
